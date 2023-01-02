@@ -2,3 +2,17 @@
 
 <PageTitle>Index</PageTitle>
 
+<ul>
+    @foreach (var set in App.Sets)
+    {
+        if (set.SetType == SetType.expansion)
+        {
+            <li>@set.Name</li>
+        }
+    }
+</ul>
+
+@code {
+    [CascadingParameter]
+    public AppState App { get; set; }
+}
