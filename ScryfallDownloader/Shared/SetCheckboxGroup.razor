@@ -1,0 +1,27 @@
+﻿<lead>@Title</lead>
+<ul class="list-group">
+    @foreach (var set in Sets)
+    {
+        if (set.SetType == Type)
+        {
+            <li class="list-group-item">
+                <input class="form-check-input me-1" type="checkbox" id="@set.Code-check" @oninput="@(async (e) => await OnCheckboxChanged.InvokeAsync(set.Code))">
+                <label class="form-check-label" for="@set.Code-check"><span class="code">@set.Code.ToUpper()</span> - @set.Name <small>@(!string.IsNullOrWhiteSpace(set.MtgoCode) && set.MtgoCode != set.Code ? $"({set.MtgoCode})" : "")</small></label>
+            </li>
+        }
+    }
+</ul>
+
+@code {
+    [Parameter]
+    public List<Set> Sets { get; set; }
+
+    [Parameter]
+    public string Title { get; set; }
+
+    [Parameter]
+    public string Type { get; set; }
+
+    [Parameter]
+    public EventCallback<string> OnCheckboxChanged { get; set; }
+}

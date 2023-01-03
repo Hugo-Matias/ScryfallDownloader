@@ -1,3 +1,4 @@
+using ScryfallApi.Client;
 using ScryfallDownloader.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -5,7 +6,11 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
-builder.Services.AddHttpClient<ScryfallApiService>();
+//builder.Services.AddHttpClient<ScryfallApiService>();
+builder.Services.AddHttpClient<ScryfallApiClient>(client =>
+{
+    client.BaseAddress = new Uri("https://api.scryfall.com");
+});
 builder.Services.AddSingleton<AppStateService>();
 
 var app = builder.Build();

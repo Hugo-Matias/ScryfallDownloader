@@ -1,0 +1,22 @@
+﻿.list-group {
+	overflow: scroll;
+	max-height: 300px;
+}
+
+.list-group-item {
+	background: #222;
+	color: #ddd;
+}
+
+lead {
+	font-size: 1.3rem;
+}
+
+label {
+	font-size: 0.9rem;
+}
+
+.code {
+	font-size: 1rem;
+	font-weight: bold;
+}

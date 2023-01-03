@@ -2,17 +2,70 @@
 
 <PageTitle>Index</PageTitle>
 
-<ul>
-    @foreach (var set in App.Sets)
-    {
-        if (set.SetType == SetType.expansion)
-        {
-            <li>@set.Name</li>
-        }
-    }
-</ul>
+<Settings></Settings>
+
+<h1 style="margin-top: 5rem;">Sets</h1>
+<div class="container d-flex">
+    <div class="col-4 me-3">
+        <SetCheckboxGroup Sets="App.Sets" OnCheckboxChanged="UpdateDownloadSets" Title="Core" Type="core" />
+        <br />
+        <SetCheckboxGroup Sets="App.Sets" Title="Alchemy" Type="alchemy" />
+        <br />
+        <SetCheckboxGroup Sets="App.Sets" Title="From The Vault" Type="from_the_vault" />
+        <br />
+        <SetCheckboxGroup Sets="App.Sets" Title="Duel Decks" Type="duel_deck" />
+        <br />
+        <SetCheckboxGroup Sets="App.Sets" Title="Commander" Type="commander" />
+        <br />
+        <SetCheckboxGroup Sets="App.Sets" Title="Vanguard" Type="vanguard" />
+        <br />
+        <SetCheckboxGroup Sets="App.Sets" Title="Box" Type="box" />
+        <br />
+        <SetCheckboxGroup Sets="App.Sets" Title="Memorabilia" Type="memorabilia" />
+    </div>
+    <div class="col-4 me-3">
+        <SetCheckboxGroup Sets="App.Sets" Title="Expansions" Type="expansion" />
+        <br />
+        <SetCheckboxGroup Sets="App.Sets" Title="Masterpiece" Type="masterpiece" />
+        <br />
+        <SetCheckboxGroup Sets="App.Sets" Title="Spellbook" Type="spellbook" />
+        <br />
+        <SetCheckboxGroup Sets="App.Sets" Title="Draft Innovation" Type="draft_innovation" />
+        <br />
+        <SetCheckboxGroup Sets="App.Sets" Title="Planechase" Type="planechase" />
+        <br />
+        <SetCheckboxGroup Sets="App.Sets" Title="Funny" Type="funny" />
+        <br />
+        <SetCheckboxGroup Sets="App.Sets" Title="Promo" Type="promo" />
+    </div>
+    <div class="col-4 me-3">
+        <SetCheckboxGroup Sets="App.Sets" Title="Masters" Type="masters" />
+        <br />
+        <SetCheckboxGroup Sets="App.Sets" Title="Arsenal" Type="arsenal" />
+        <br />
+        <SetCheckboxGroup Sets="App.Sets" Title="Premium Deck" Type="premium_deck" />
+        <br />
+        <SetCheckboxGroup Sets="App.Sets" Title="MTGO Treasure Chest" Type="treasure_chest" />
+        <br />
+        <SetCheckboxGroup Sets="App.Sets" Title="Archenemy" Type="archenemy" />
+        <br />
+        <SetCheckboxGroup Sets="App.Sets" Title="Starter" Type="starter" />
+        <br />
+        <SetCheckboxGroup Sets="App.Sets" Title="Tokens" Type="token" />
+    </div>
+</div>
 
 @code {
     [CascadingParameter]
     public AppState App { get; set; }
+
+    private List<string> _downloadSets = new();
+
+    private void UpdateDownloadSets(string code)
+    {
+        if (_downloadSets.Contains(code))
+            _downloadSets.Remove(code);
+        else
+            _downloadSets.Add(code);
+    }
 }

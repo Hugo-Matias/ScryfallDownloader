@@ -1,0 +1,10 @@
+﻿.row {
+	top: 0;
+	left: 0;
+	position:fixed;
+	background: black;
+	width:100%;
+	min-height: 5rem;
+	margin-bottom: 1rem;
+	z-index: 1000;
+}

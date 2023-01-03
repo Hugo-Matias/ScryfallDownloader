@@ -1,5 +1,5 @@
 ﻿@inject AppStateService State
-@inject ScryfallApiService Api
+@inject ScryfallApiClient Api
 
 <CascadingValue Value="@this">
     @ChildContent
@@ -9,10 +9,17 @@
     [Parameter]
     public RenderFragment ChildContent { get; set; }
 
-    public List<SetModel> Sets { get; set; } = new();
+    public List<Set> Sets { get; set; } = new();
 
     protected override async Task OnInitializedAsync()
     {
-        Sets = await Api.GetSets();
+
+        await GetSets();
+    }
+
+    private async Task GetSets()
+    {
+        var result = await Api.Sets.Get();
+        Sets = new List<Set>(result.Data);
     }
 }
