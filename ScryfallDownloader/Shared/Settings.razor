@@ -1,16 +1,23 @@
-﻿<div class="row">
+﻿@implements IDisposable
+
+<div class="row">
     <EditForm Model="Model" OnValidSubmit="OnSubmit" class="row">
         <div class="col-4">
             <label class="form-label" for="images-path">Images Path</label>
             <input id="images-path" class="form-control" type="text" @bind-value="Model.ImagesPath" @bind-value:event="oninput" />
         </div>
         <div class="col-4">
-
         </div>
         <div class="col-4">
             <button class="btn btn-outline-success" type="submit">Download</button>
         </div>
     </EditForm>
+    @if (State.IsDownloading)
+    {
+        <div class="progress">
+            <div class="progress-bar" role="progressbar" style="width:@((int)((float)State.CurrentCard / (float)State.TotalCards * 100))%" aria-valuenow="@State.CurrentCard" aria-valuemin="0" aria-valuemax="@State.TotalCards"><span>@State.CurrentCard / @State.TotalCards  -  @State.CurrentCardName</span></div>
+        </div>
+    }
 </div>
 
 @code {
@@ -19,4 +26,21 @@
 
     [Parameter]
     public EventCallback OnSubmit { get; set; }
+
+    [CascadingParameter]
+    public DownloadStates State { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        State.OnDownloadChanged += Update;
+        State.OnCardDownloaded += Update;
+    }
+
+    private void Update() => StateHasChanged();
+
+    void IDisposable.Dispose()
+    {
+        State.OnDownloadChanged -= Update;
+        State.OnCardDownloaded -= Update;
+    }
 }

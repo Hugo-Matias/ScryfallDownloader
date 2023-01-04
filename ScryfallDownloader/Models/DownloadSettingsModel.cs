@@ -12,5 +12,7 @@ namespace ScryfallDownloader.Models
         public bool ConvertToJpg { get; set; } = false;
         public int OutputQuality { get; set; } = 75;
         public string Format { get; set; } = "png";
+        public bool IgnoreExisting { get; set; } = true;
+        public bool RemoveExisting { get; set; } = false;
     }
 }

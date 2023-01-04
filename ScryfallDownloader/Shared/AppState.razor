@@ -1,11 +1,12 @@
-﻿@inject AppStateService State
-@inject ScryfallApiClient Api
+﻿@inject ScryfallApiClient Api
 @inject DownloaderService Downloader
 @inject IOService IO
 @inject ImageService ImageService
 
 <CascadingValue Value="@this">
-    @ChildContent
+    <CascadingValue Value="@state">
+        @ChildContent
+    </CascadingValue>
 </CascadingValue>
 
 @code {
@@ -14,6 +15,9 @@
 
     public List<Set> Sets { get; set; } = new();
     public DownloadSettingsModel DownloadSettings { get; set; } = new();
+
+    private Dictionary<string, List<string>> _duplicatePrints = new();
+    private DownloadStates state = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -30,6 +34,8 @@
     public async Task GetCards()
     {
         if (DownloadSettings.Sets.Count <= 0) return;
+
+        DownloadSettings.Cards.Clear();
 
         foreach (var set in DownloadSettings.Sets)
         {
@@ -48,13 +54,22 @@
                 throw e;
             }
         }
+
+        state.CurrentCard = 0;
+        state.TotalCards = DownloadSettings.Cards.Count();
     }
 
     private async Task<bool> SearchCardsAndAppend(string set, int page)
     {
         try
         {
-            var cards = await Api.Cards.Search($"set:{set}", page, SearchOptions.CardSort.Set);
+            SearchOptions options = new SearchOptions()
+                {
+                    Sort = SearchOptions.CardSort.Set,
+                    Mode = SearchOptions.RollupMode.Prints
+                };
+
+            var cards = await Api.Cards.Search($"set:{set}", page, options);
 
             DownloadSettings.Cards.AddRange(cards.Data);
 
@@ -68,26 +83,52 @@
 
     public async Task DownloadImages()
     {
+        state.IsDownloading = true;
+
         foreach (var card in DownloadSettings.Cards)
         {
-            var data = await Downloader.DownloadImage(card.ImageUris[DownloadSettings.Format].AbsoluteUri);
-            IO.CreateDirectory(Path.Combine(DownloadSettings.ImagesPath, card.Set));
+            state.CurrentCardName = $"{card.Name} | {card.Set.ToUpper()}";
+            state.CurrentCard++;
 
             DownloadSettings.ConvertToJpg = true;
 
-            if (DownloadSettings.ConvertToJpg)
-                data = ImageService.ConvertToJpg(data, DownloadSettings.OutputQuality);
-
             string saveFormat;
-
             if (DownloadSettings.Format != "png" || DownloadSettings.ConvertToJpg)
                 saveFormat = "jpg";
             else
                 saveFormat = "png";
 
-            string path = Path.Combine(DownloadSettings.ImagesPath, card.Set, $"{card.Name}.full.{saveFormat}");
+            IO.CreateDirectory(Path.Combine(DownloadSettings.ImagesPath, card.Set));
+
+            string path = Path.Combine(DownloadSettings.ImagesPath, card.Set, $"{ParseCardName(card)}.full.{saveFormat}");
+
+            if (File.Exists(path) && DownloadSettings.IgnoreExisting) continue;
+
+            var data = await Downloader.DownloadImage(card.ImageUris[DownloadSettings.Format].AbsoluteUri);
+
+            if (DownloadSettings.ConvertToJpg)
+                data = ImageService.ConvertToJpg(data, DownloadSettings.OutputQuality);
 
             await IO.SaveFile(path, data);
         }
+
+        state.IsDownloading = false;
+        _duplicatePrints.Clear();
+    }
+
+    private string ParseCardName(Card card)
+    {
+        if (DownloadSettings.Cards.Count(c => c.Name == card.Name && c.Set == card.Set) > 1)
+        {
+            if (!_duplicatePrints.ContainsKey(card.Set)) _duplicatePrints.Add(card.Set, new List<string>());
+
+            _duplicatePrints[card.Set].Add(card.Name);
+
+            var count = _duplicatePrints[card.Set].Count(c => c == card.Name);
+
+            return card.Name + count;
+        }
+
+        return card.Name;
     }
 }
