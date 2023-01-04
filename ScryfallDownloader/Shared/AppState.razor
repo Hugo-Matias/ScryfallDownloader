@@ -90,31 +90,42 @@
             state.CurrentCardName = $"{card.Name} | {card.Set.ToUpper()}";
             state.CurrentCard++;
 
-            DownloadSettings.ConvertToJpg = true;
+            var saveFormat = ParseFormat();
 
-            string saveFormat;
-            if (DownloadSettings.Format != "png" || DownloadSettings.ConvertToJpg)
-                saveFormat = "jpg";
-            else
-                saveFormat = "png";
+            var setPath = Path.Combine(DownloadSettings.ImagesPath, card.Set);
 
-            IO.CreateDirectory(Path.Combine(DownloadSettings.ImagesPath, card.Set));
+            CreateDirectory(setPath);
 
-            string path = Path.Combine(DownloadSettings.ImagesPath, card.Set, $"{ParseCardName(card)}.full.{saveFormat}");
+            var cardPath = Path.Combine(setPath, $"{ParseCardName(card)}.full.{saveFormat}");
 
-            if (File.Exists(path) && DownloadSettings.IgnoreExisting) continue;
+            if (File.Exists(cardPath) && DownloadSettings.IgnoreExisting) continue;
 
-            var data = await Downloader.DownloadImage(card.ImageUris[DownloadSettings.Format].AbsoluteUri);
-
-            if (DownloadSettings.ConvertToJpg)
-                data = ImageService.ConvertToJpg(data, DownloadSettings.OutputQuality);
-
-            await IO.SaveFile(path, data);
+            await SaveImage(card, cardPath);
         }
 
         state.IsDownloading = false;
         _duplicatePrints.Clear();
     }
+
+    private async Task SaveImage(Card card, string path)
+    {
+        var data = await Downloader.DownloadImage(card.ImageUris[DownloadSettings.Format].AbsoluteUri);
+
+        if (DownloadSettings.ConvertToJpg && DownloadSettings.Format == "png")
+            data = ImageService.ConvertToJpg(data, DownloadSettings.OutputQuality);
+
+        await IO.SaveFile(path, data);
+    }
+
+    private void CreateDirectory(string path)
+    {
+        if (Directory.Exists(path) && DownloadSettings.RemoveExisting)
+            Directory.Delete(path, true);
+
+        IO.CreateDirectory(path);
+    }
+
+    private string ParseFormat() => (DownloadSettings.Format != "png" || DownloadSettings.ConvertToJpg) ? "jpg" : "png";
 
     private string ParseCardName(Card card)
     {

@@ -1,4 +1,5 @@
-﻿.row {
+﻿.settings {
+	padding: 1.5rem;
 	top: 0;
 	left: 0;
 	position:fixed;
@@ -7,4 +8,16 @@
 	min-height: 5rem;
 	margin-bottom: 1rem;
 	z-index: 1000;
+}
+
+.options-container,
+.download-container {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.download {
+	width: 80%;
+	height: 70%;
 }

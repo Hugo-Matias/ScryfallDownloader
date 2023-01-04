@@ -1,15 +1,66 @@
 ﻿@implements IDisposable
 
-<div class="row">
+<div class="settings row">
     <EditForm Model="Model" OnValidSubmit="OnSubmit" class="row">
-        <div class="col-4">
+        <div class="col-5">
             <label class="form-label" for="images-path">Images Path</label>
             <input id="images-path" class="form-control" type="text" @bind-value="Model.ImagesPath" @bind-value:event="oninput" />
+            <label class="form-label" for="output-quality">Quality: <strong>@Model.OutputQuality</strong></label>
+            <input type="range" class="form-range" id="output-quality" @bind-value="Model.OutputQuality" @bind-value:event="oninput" min="0" max="100" step="5" />
         </div>
-        <div class="col-4">
+        <div class="col-5">
+            <div class="row options-container">
+                <div class="col-6">
+                    <label class="form-label" for="format">Format</label>
+                    <div id="format" class="row">
+                        <div class="col-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="formatRadio" id="format-png" @onchange="@(() => SetFormat("png"))" checked="@(Model.Format == "png")">
+                                <label class="form-check-label" for="format-png">PNG</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="formatRadio" id="format-border" @onchange="@(() => SetFormat("border_crop"))" checked="@(Model.Format == "border_crop")">
+                                <label class="form-check-label" for="format-border">Border Crop</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="formatRadio" id="format-art" @onchange="@(() => SetFormat("art_crop"))" checked="@(Model.Format == "art_crop")">
+                                <label class="form-check-label" for="format-art">Art Crop</label>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="formatRadio" id="format-large" @onchange="@(() => SetFormat("large"))" checked="@(Model.Format == "large")">
+                                <label class="form-check-label" for="format-large">Large</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="formatRadio" id="format-normal" @onchange="@(() => SetFormat("normal"))" checked="@(Model.Format == "normal")">
+                                <label class="form-check-label" for="format-normal">Normal</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="formatRadio" id="format-smal" @onchange="@(() => SetFormat("small"))" checked="@(Model.Format == "small")">
+                                <label class="form-check-label" for="format-small">Small</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6">
+                    <div class="form-check">
+                        <label class="form-check-label" for="convert-jpg">Convert to JPG</label>
+                        <input type="checkbox" class="form-check-input" id="convert-jpg" @bind-value="Model.ConvertToJpg" checked="@Model.ConvertToJpg" />
+                    </div>
+                    <div class="form-check">
+                        <label class="form-check-label" for="ignore">Ignore Existing</label>
+                        <input type="checkbox" class="form-check-input" id="ignore" @bind-value="Model.IgnoreExisting" checked="@Model.IgnoreExisting" />
+                    </div>
+                    <div class="form-check">
+                        <label class="form-check-label" for="remove">Remove Existing</label>
+                        <input type="checkbox" class="form-check-input" id="remove" @bind-value="Model.RemoveExisting" checked="@Model.RemoveExisting" />
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="col-4">
-            <button class="btn btn-outline-success" type="submit">Download</button>
+        <div class="col-2 download-container">
+            <button class="btn btn-outline-success download" type="submit">Download</button>
         </div>
     </EditForm>
     @if (State.IsDownloading)
@@ -37,6 +88,8 @@
     }
 
     private void Update() => StateHasChanged();
+
+    private void SetFormat(string format) => Model.Format = format;
 
     void IDisposable.Dispose()
     {
