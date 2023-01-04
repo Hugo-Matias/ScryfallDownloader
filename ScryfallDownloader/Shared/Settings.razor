@@ -5,10 +5,13 @@
         <div class="col-5">
             <label class="form-label" for="images-path">Images Path</label>
             <input id="images-path" class="form-control" type="text" @bind-value="Model.ImagesPath" @bind-value:event="oninput" />
-            <label class="form-label" for="output-quality">Quality: <strong>@Model.OutputQuality</strong></label>
-            <input type="range" class="form-range" id="output-quality" @bind-value="Model.OutputQuality" @bind-value:event="oninput" min="0" max="100" step="5" />
+            <br />
+            <label class="form-label" for="search-code">Search Code</label>
+            <input id="search-code" class="form-control" type="text" @oninput="OnSearchChanged" />
         </div>
         <div class="col-5">
+            <label class="form-label" for="output-quality">Quality: <strong>@Model.OutputQuality</strong></label>
+            <input type="range" class="form-range" id="output-quality" @bind-value="Model.OutputQuality" @bind-value:event="oninput" min="0" max="100" step="5" />
             <div class="row options-container">
                 <div class="col-6">
                     <label class="form-label" for="format">Format</label>
@@ -44,6 +47,7 @@
                     </div>
                 </div>
                 <div class="col-6">
+                    <label class="form-label">Options</label>
                     <div class="form-check">
                         <label class="form-check-label" for="convert-jpg">Convert to JPG</label>
                         <input type="checkbox" class="form-check-input" id="convert-jpg" @bind-value="Model.ConvertToJpg" checked="@Model.ConvertToJpg" />
@@ -78,7 +82,8 @@
     [Parameter]
     public EventCallback OnSubmit { get; set; }
 
-
+    [Parameter]
+    public EventCallback<ChangeEventArgs> OnSearchChanged { get; set; }
 
     [CascadingParameter]
     public DownloadStates State { get; set; }
