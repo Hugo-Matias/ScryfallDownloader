@@ -12,7 +12,6 @@ builder.Services.AddHttpClient<ScryfallApiClient>(client =>
     client.BaseAddress = new Uri("https://api.scryfall.com");
 });
 builder.Services.AddHttpClient<DownloaderService>();
-builder.Services.AddSingleton<AppStateService>();
 builder.Services.AddSingleton<IOService>();
 builder.Services.AddSingleton<ImageService>();
 
