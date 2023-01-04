@@ -1,5 +1,8 @@
 ﻿@inject AppStateService State
 @inject ScryfallApiClient Api
+@inject DownloaderService Downloader
+@inject IOService IO
+@inject ImageService ImageService
 
 <CascadingValue Value="@this">
     @ChildContent
@@ -10,10 +13,11 @@
     public RenderFragment ChildContent { get; set; }
 
     public List<Set> Sets { get; set; } = new();
+    public DownloadSettingsModel DownloadSettings { get; set; } = new();
 
     protected override async Task OnInitializedAsync()
     {
-
+        DownloadSettings.ImagesPath = @"E:\Jogos\Magic the Gathering\Forge\data\cache\pics\cards";
         await GetSets();
     }
 
@@ -21,5 +25,69 @@
     {
         var result = await Api.Sets.Get();
         Sets = new List<Set>(result.Data);
+    }
+
+    public async Task GetCards()
+    {
+        if (DownloadSettings.Sets.Count <= 0) return;
+
+        foreach (var set in DownloadSettings.Sets)
+        {
+            try
+            {
+                int page = 1;
+                bool hasMore = false;
+                do
+                {
+                    hasMore = await SearchCardsAndAppend(set, page);
+                    page++;
+                } while (hasMore == true);
+            }
+            catch (Exception e)
+            {
+                throw e;
+            }
+        }
+    }
+
+    private async Task<bool> SearchCardsAndAppend(string set, int page)
+    {
+        try
+        {
+            var cards = await Api.Cards.Search($"set:{set}", page, SearchOptions.CardSort.Set);
+
+            DownloadSettings.Cards.AddRange(cards.Data);
+
+            return cards.HasMore;
+        }
+        catch (Exception e)
+        {
+            throw e;
+        }
+    }
+
+    public async Task DownloadImages()
+    {
+        foreach (var card in DownloadSettings.Cards)
+        {
+            var data = await Downloader.DownloadImage(card.ImageUris[DownloadSettings.Format].AbsoluteUri);
+            IO.CreateDirectory(Path.Combine(DownloadSettings.ImagesPath, card.Set));
+
+            DownloadSettings.ConvertToJpg = true;
+
+            if (DownloadSettings.ConvertToJpg)
+                data = ImageService.ConvertToJpg(data, DownloadSettings.OutputQuality);
+
+            string saveFormat;
+
+            if (DownloadSettings.Format != "png" || DownloadSettings.ConvertToJpg)
+                saveFormat = "jpg";
+            else
+                saveFormat = "png";
+
+            string path = Path.Combine(DownloadSettings.ImagesPath, card.Set, $"{card.Name}.full.{saveFormat}");
+
+            await IO.SaveFile(path, data);
+        }
     }
 }

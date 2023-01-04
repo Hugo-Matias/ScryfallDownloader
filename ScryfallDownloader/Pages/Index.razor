@@ -2,56 +2,30 @@
 
 <PageTitle>Index</PageTitle>
 
-<Settings></Settings>
+<Settings Model="App.DownloadSettings" OnSubmit="Download"></Settings>
 
 <h1 style="margin-top: 5rem;">Sets</h1>
 <div class="container d-flex">
     <div class="col-4 me-3">
-        <SetCheckboxGroup Sets="App.Sets" OnCheckboxChanged="UpdateDownloadSets" Title="Core" Type="core" />
-        <br />
-        <SetCheckboxGroup Sets="App.Sets" Title="Alchemy" Type="alchemy" />
-        <br />
-        <SetCheckboxGroup Sets="App.Sets" Title="From The Vault" Type="from_the_vault" />
-        <br />
-        <SetCheckboxGroup Sets="App.Sets" Title="Duel Decks" Type="duel_deck" />
-        <br />
-        <SetCheckboxGroup Sets="App.Sets" Title="Commander" Type="commander" />
-        <br />
-        <SetCheckboxGroup Sets="App.Sets" Title="Vanguard" Type="vanguard" />
-        <br />
-        <SetCheckboxGroup Sets="App.Sets" Title="Box" Type="box" />
-        <br />
-        <SetCheckboxGroup Sets="App.Sets" Title="Memorabilia" Type="memorabilia" />
+        @foreach (var edition in _group1)
+        {
+            <SetCheckboxGroup Sets="App.Sets" OnCheckboxChanged="UpdateDownloadSets" Title="@edition.Item1" Type="@edition.Item2" />
+            <br />
+        }
     </div>
     <div class="col-4 me-3">
-        <SetCheckboxGroup Sets="App.Sets" Title="Expansions" Type="expansion" />
-        <br />
-        <SetCheckboxGroup Sets="App.Sets" Title="Masterpiece" Type="masterpiece" />
-        <br />
-        <SetCheckboxGroup Sets="App.Sets" Title="Spellbook" Type="spellbook" />
-        <br />
-        <SetCheckboxGroup Sets="App.Sets" Title="Draft Innovation" Type="draft_innovation" />
-        <br />
-        <SetCheckboxGroup Sets="App.Sets" Title="Planechase" Type="planechase" />
-        <br />
-        <SetCheckboxGroup Sets="App.Sets" Title="Funny" Type="funny" />
-        <br />
-        <SetCheckboxGroup Sets="App.Sets" Title="Promo" Type="promo" />
+        @foreach (var edition in _group2)
+        {
+            <SetCheckboxGroup Sets="App.Sets" OnCheckboxChanged="UpdateDownloadSets" Title="@edition.Item1" Type="@edition.Item2" />
+            <br />
+        }
     </div>
     <div class="col-4 me-3">
-        <SetCheckboxGroup Sets="App.Sets" Title="Masters" Type="masters" />
-        <br />
-        <SetCheckboxGroup Sets="App.Sets" Title="Arsenal" Type="arsenal" />
-        <br />
-        <SetCheckboxGroup Sets="App.Sets" Title="Premium Deck" Type="premium_deck" />
-        <br />
-        <SetCheckboxGroup Sets="App.Sets" Title="MTGO Treasure Chest" Type="treasure_chest" />
-        <br />
-        <SetCheckboxGroup Sets="App.Sets" Title="Archenemy" Type="archenemy" />
-        <br />
-        <SetCheckboxGroup Sets="App.Sets" Title="Starter" Type="starter" />
-        <br />
-        <SetCheckboxGroup Sets="App.Sets" Title="Tokens" Type="token" />
+        @foreach (var edition in _group3)
+        {
+            <SetCheckboxGroup Sets="App.Sets" OnCheckboxChanged="UpdateDownloadSets" Title="@edition.Item1" Type="@edition.Item2" />
+            <br />
+        }
     </div>
 </div>
 
@@ -59,13 +33,24 @@
     [CascadingParameter]
     public AppState App { get; set; }
 
-    private List<string> _downloadSets = new();
+    // (Checkbox Group Title, Scryfall SetType)
+    private List<(string, string)> _group1 = new() { ("Core", "core"), ("Alchemy", "alchemy"), ("From The Vault", "from_the_vault"), ("Duel Decks", "duel_deck"), ("Commander", "commander"), ("Vanguard", "vanguard"), ("Box", "box"), ("Memorabilia", "memorabilia") };
+
+    private List<(string, string)> _group2 = new() { ("Expansions", "expansion"), ("Masterpiece", "masterpiece"), ("Spellbook", "spellbook"), ("Draft", "draft_innovation"), ("Planechase", "planechase"), ("Funny", "funny"), ("Promo", "promo") };
+
+    private List<(string, string)> _group3 = new() { ("Masters", "masters"), ("Arsenal", "arsenal"), ("Premium Deck", "premium_deck"), ("MTGO Treasure Chest", "treasure_chest"), ("Archenemy", "archenemy"), ("Starter", "starter"), ("Tokens", "token") };
 
     private void UpdateDownloadSets(string code)
     {
-        if (_downloadSets.Contains(code))
-            _downloadSets.Remove(code);
+        if (App.DownloadSettings.Sets.Contains(code))
+            App.DownloadSettings.Sets.Remove(code);
         else
-            _downloadSets.Add(code);
+            App.DownloadSettings.Sets.Add(code);
+    }
+
+    private async Task Download()
+    {
+        await App.GetCards();
+        await App.DownloadImages();
     }
 }

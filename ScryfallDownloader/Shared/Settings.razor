@@ -1,7 +1,22 @@
 ﻿<div class="row">
+    <EditForm Model="Model" OnValidSubmit="OnSubmit" class="row">
+        <div class="col-4">
+            <label class="form-label" for="images-path">Images Path</label>
+            <input id="images-path" class="form-control" type="text" @bind-value="Model.ImagesPath" @bind-value:event="oninput" />
+        </div>
+        <div class="col-4">
 
+        </div>
+        <div class="col-4">
+            <button class="btn btn-outline-success" type="submit">Download</button>
+        </div>
+    </EditForm>
 </div>
 
 @code {
+    [Parameter]
+    public DownloadSettingsModel Model { get; set; }
 
+    [Parameter]
+    public EventCallback OnSubmit { get; set; }
 }
