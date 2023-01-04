@@ -17,6 +17,7 @@
     public DownloadSettingsModel DownloadSettings { get; set; } = new();
 
     private Dictionary<string, List<string>> _duplicatePrints = new();
+    private string _currentSet;
     private DownloadStates state = new();
 
     protected override async Task OnInitializedAsync()
@@ -85,16 +86,17 @@
     {
         state.IsDownloading = true;
 
+        _currentSet = DownloadSettings.Cards[0].Set;
+        var setPath = CheckDirectory(_currentSet);
+
         foreach (var card in DownloadSettings.Cards)
         {
             state.CurrentCardName = $"{card.Name} | {card.Set.ToUpper()}";
             state.CurrentCard++;
 
+            if (_currentSet != card.Set) setPath = CheckDirectory(card.Set);
+
             var saveFormat = ParseFormat();
-
-            var setPath = Path.Combine(DownloadSettings.ImagesPath, card.Set);
-
-            CreateDirectory(setPath);
 
             var cardPath = Path.Combine(setPath, $"{ParseCardName(card)}.full.{saveFormat}");
 
@@ -117,12 +119,18 @@
         await IO.SaveFile(path, data);
     }
 
-    private void CreateDirectory(string path)
+    private string CheckDirectory(string set)
     {
+        var path = Path.Combine(DownloadSettings.ImagesPath, set);
+
         if (Directory.Exists(path) && DownloadSettings.RemoveExisting)
             Directory.Delete(path, true);
 
         IO.CreateDirectory(path);
+
+        _currentSet = set;
+
+        return path;
     }
 
     private string ParseFormat() => (DownloadSettings.Format != "png" || DownloadSettings.ConvertToJpg) ? "jpg" : "png";
