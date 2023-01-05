@@ -69,6 +69,7 @@
     </EditForm>
     @if (State.IsDownloading)
     {
+        <br />
         <div class="progress">
             <div class="progress-bar" role="progressbar" style="width:@((int)((float)State.CurrentCard / (float)State.TotalCards * 100))%" aria-valuenow="@State.CurrentCard" aria-valuemin="0" aria-valuemax="@State.TotalCards"><span>@State.CurrentCard / @State.TotalCards  -  @State.CurrentCardName</span></div>
         </div>

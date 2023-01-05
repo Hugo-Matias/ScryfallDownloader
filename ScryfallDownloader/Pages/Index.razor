@@ -4,24 +4,28 @@
 
 <Settings Model="App.DownloadSettings" OnSubmit="Download" OnSearchChanged="FilterSets"></Settings>
 
-<h1>Sets</h1>
+<div class="col title">
+    <h1>Sets</h1>
+    <span><small>@(string.Join(" | ", App.DownloadSettings.Sets))</small></span>
+</div>
+<br />
 <div class="container d-flex">
     <div class="col-4 me-3">
         @foreach (var edition in _group1)
         {
-            <SetCheckboxGroup Sets="App.Sets" OnCheckboxChanged="UpdateDownloadSets" Title="@edition.Item1" Type="@edition.Item2" Filter="@_filter"/>
+            <SetCheckboxGroup Sets="App.Sets" OnCheckboxChanged="UpdateDownloadSets" Title="@edition.Item1" Type="@edition.Item2"/>
         }
     </div>
     <div class="col-4 me-3">
         @foreach (var edition in _group2)
         {
-            <SetCheckboxGroup Sets="App.Sets" OnCheckboxChanged="UpdateDownloadSets" Title="@edition.Item1" Type="@edition.Item2"  Filter="@_filter"/>
+            <SetCheckboxGroup Sets="App.Sets" OnCheckboxChanged="UpdateDownloadSets" Title="@edition.Item1" Type="@edition.Item2"/>
         }
     </div>
     <div class="col-4 me-3">
         @foreach (var edition in _group3)
         {
-            <SetCheckboxGroup Sets="App.Sets" OnCheckboxChanged="UpdateDownloadSets" Title="@edition.Item1" Type="@edition.Item2"  Filter="@_filter"/>
+            <SetCheckboxGroup Sets="App.Sets" OnCheckboxChanged="UpdateDownloadSets" Title="@edition.Item1" Type="@edition.Item2"/>
         }
     </div>
 </div>
@@ -37,8 +41,6 @@
 
     private List<(string, string)> _group3 = new() { ("Masters", "masters"), ("Arsenal", "arsenal"), ("Premium Deck", "premium_deck"), ("MTGO Treasure Chest", "treasure_chest"), ("Archenemy", "archenemy"), ("Starter", "starter"), ("Tokens", "token") };
 
-    private string _filter = "";
-
     private void UpdateDownloadSets(string code)
     {
         if (App.DownloadSettings.Sets.Contains(code))
@@ -49,7 +51,7 @@
 
     private void FilterSets(ChangeEventArgs e)
     {
-        _filter = e.Value.ToString() ?? "";
+        App.SetFilter = e.Value.ToString() ?? "";
         StateHasChanged();
     }
 

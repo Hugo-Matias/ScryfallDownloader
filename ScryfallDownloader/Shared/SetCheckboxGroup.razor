@@ -1,10 +1,10 @@
-﻿@if (!string.IsNullOrWhiteSpace(Filter) && Sets.Count(s => s.Code.Contains(Filter.ToLower()) && s.SetType == Type) >= 1)
+﻿@if (!string.IsNullOrWhiteSpace(App.SetFilter) && Sets.Count(s => s.Code.Contains(App.SetFilter.ToLower()) && s.SetType == Type) >= 1)
 {
     <lead>@Title</lead>
     <ul class="list-group">
         @foreach (var set in Sets)
         {
-            if (set.SetType == Type && !string.IsNullOrEmpty(Filter) && set.Code.Contains(Filter.ToLower()))
+            if (set.SetType == Type && !string.IsNullOrEmpty(App.SetFilter) && set.Code.Contains(App.SetFilter.ToLower()))
             {
                 <li class="list-group-item">
                     <input class="form-check-input me-1" type="checkbox" id="@set.Code-check" @oninput="@(async (e) => await OnCheckboxChanged.InvokeAsync(set.Code))" checked="@App.DownloadSettings.Sets.Contains(set.Code)">
@@ -15,7 +15,7 @@
     </ul>
     <br />
 }
-else if (string.IsNullOrWhiteSpace(Filter))
+else if (string.IsNullOrWhiteSpace(App.SetFilter))
 {
     <lead>@Title</lead>
     <ul class="list-group">
@@ -45,9 +45,6 @@ else if (string.IsNullOrWhiteSpace(Filter))
 
     [Parameter]
     public string Type { get; set; }
-
-    [Parameter]
-    public string Filter { get; set; }
 
     [Parameter]
     public EventCallback<string> OnCheckboxChanged { get; set; }

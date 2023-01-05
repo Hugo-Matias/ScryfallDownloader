@@ -15,6 +15,7 @@
 
     public List<Set> Sets { get; set; } = new();
     public DownloadSettingsModel DownloadSettings { get; set; } = new();
+    public string SetFilter { get; set; } = "";
 
     private Dictionary<string, List<string>> _duplicatePrints = new();
     private string _currentSet;
@@ -98,20 +99,39 @@
 
             var saveFormat = ParseFormat();
 
-            var cardPath = Path.Combine(setPath, $"{ParseCardName(card)}.full.{saveFormat}");
+            if (card.Layout == "transform")
+            {
+                foreach (var face in card.CardFaces)
+                {
+                    var cardPath = Path.Combine(setPath, $"{ParseCardName(card, face)}.full.{saveFormat}");
 
-            if (File.Exists(cardPath) && DownloadSettings.IgnoreExisting) continue;
+                    if (SetFilter == "instant")
+                        SaveImage(face.ImageUris, cardPath);
+                    else
+                        await SaveImage(face.ImageUris, cardPath);
+                }
+            }
+            else
+            {
+                var cardPath = Path.Combine(setPath, $"{ParseCardName(card)}.full.{saveFormat}");
 
-            await SaveImage(card, cardPath);
+                if (SetFilter == "instant")
+                    SaveImage(card.ImageUris, cardPath);
+                else
+                    await SaveImage(card.ImageUris, cardPath);
+            }
         }
 
         state.IsDownloading = false;
         _duplicatePrints.Clear();
     }
 
-    private async Task SaveImage(Card card, string path)
+    private async Task SaveImage(Dictionary<string, Uri> uris, string path)
     {
-        var data = await Downloader.DownloadImage(card.ImageUris[DownloadSettings.Format].AbsoluteUri);
+        if (File.Exists(path) && DownloadSettings.IgnoreExisting) return;
+        if (uris == null || uris[DownloadSettings.Format] == null) return;
+
+        var data = await Downloader.DownloadImage(uris[DownloadSettings.Format].AbsoluteUri);
 
         if (DownloadSettings.ConvertToJpg && DownloadSettings.Format == "png")
             data = ImageService.ConvertToJpg(data, DownloadSettings.OutputQuality);
@@ -135,19 +155,24 @@
 
     private string ParseFormat() => (DownloadSettings.Format != "png" || DownloadSettings.ConvertToJpg) ? "jpg" : "png";
 
-    private string ParseCardName(Card card)
+    private string ParseCardName(Card card, CardFace? face = null)
     {
+        var cardName = face == null ? card.Name : face.Name;
+
         if (DownloadSettings.Cards.Count(c => c.Name == card.Name && c.Set == card.Set) > 1)
         {
             if (!_duplicatePrints.ContainsKey(card.Set)) _duplicatePrints.Add(card.Set, new List<string>());
 
-            _duplicatePrints[card.Set].Add(card.Name);
+            _duplicatePrints[card.Set].Add(cardName);
 
-            var count = _duplicatePrints[card.Set].Count(c => c == card.Name);
+            var count = _duplicatePrints[card.Set].Count(c => c == cardName);
 
-            return card.Name + count;
+            cardName = cardName + count;
         }
 
-        return card.Name;
+        // Split cards
+        cardName = cardName.Replace(@" // ", "");
+
+        return cardName;
     }
 }
