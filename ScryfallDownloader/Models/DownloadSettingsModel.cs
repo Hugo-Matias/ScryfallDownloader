@@ -7,6 +7,8 @@ namespace ScryfallDownloader.Models
     {
         [Required]
         public string? ImagesPath { get; set; }
+        [Required]
+        public string? EditionsPath { get; set; }
         /// <summary>
         /// List of selected Sets for download
         /// </summary>

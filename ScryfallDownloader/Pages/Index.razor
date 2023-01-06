@@ -2,7 +2,7 @@
 
 <PageTitle>Index</PageTitle>
 
-<Settings Model="App.DownloadSettings" OnSubmit="Download" OnSearchChanged="FilterSets"></Settings>
+<Settings Model="App.DownloadSettings" OnAudit="AuditCards" OnSubmit="Download" OnSearchChanged="FilterSets"></Settings>
 
 <div class="col title">
     <h1>Sets</h1>
@@ -13,19 +13,19 @@
     <div class="col-4 me-3">
         @foreach (var edition in _group1)
         {
-            <SetCheckboxGroup Sets="App.Sets" OnCheckboxChanged="UpdateDownloadSets" Title="@edition.Item1" Type="@edition.Item2"/>
+            <SetCheckboxGroup Sets="App.AllSets" OnCheckboxChanged="UpdateDownloadSets" Title="@edition.Item1" Type="@edition.Item2"/>
         }
     </div>
     <div class="col-4 me-3">
         @foreach (var edition in _group2)
         {
-            <SetCheckboxGroup Sets="App.Sets" OnCheckboxChanged="UpdateDownloadSets" Title="@edition.Item1" Type="@edition.Item2"/>
+            <SetCheckboxGroup Sets="App.AllSets" OnCheckboxChanged="UpdateDownloadSets" Title="@edition.Item1" Type="@edition.Item2"/>
         }
     </div>
     <div class="col-4 me-3">
         @foreach (var edition in _group3)
         {
-            <SetCheckboxGroup Sets="App.Sets" OnCheckboxChanged="UpdateDownloadSets" Title="@edition.Item1" Type="@edition.Item2"/>
+            <SetCheckboxGroup Sets="App.AllSets" OnCheckboxChanged="UpdateDownloadSets" Title="@edition.Item1" Type="@edition.Item2"/>
         }
     </div>
 </div>
@@ -35,11 +35,11 @@
     public AppState App { get; set; }
 
     // (Checkbox Group Title, Scryfall SetType)
-    private List<(string, string)> _group1 = new() { ("Core", "core"), ("Alchemy", "alchemy"), ("From The Vault", "from_the_vault"), ("Duel Decks", "duel_deck"), ("Commander", "commander"), ("Vanguard", "vanguard"), ("Box", "box"), ("Memorabilia", "memorabilia") };
+    private List<(string, string)> _group1 = new() { ("Core", "core"), ("Alchemy", "alchemy"), ("From The Vault", "from_the_vault"), ("Duel Decks", "duel_deck"), ("Commander", "commander"), ("Vanguard", "vanguard"), ("Box", "box") };
 
     private List<(string, string)> _group2 = new() { ("Expansions", "expansion"), ("Masterpiece", "masterpiece"), ("Spellbook", "spellbook"), ("Draft", "draft_innovation"), ("Planechase", "planechase"), ("Funny", "funny"), ("Promo", "promo") };
 
-    private List<(string, string)> _group3 = new() { ("Masters", "masters"), ("Arsenal", "arsenal"), ("Premium Deck", "premium_deck"), ("MTGO Treasure Chest", "treasure_chest"), ("Archenemy", "archenemy"), ("Starter", "starter"), ("Tokens", "token") };
+    private List<(string, string)> _group3 = new() { ("Masters", "masters"), ("Arsenal", "arsenal"), ("Premium Deck", "premium_deck"), ("MTGO Treasure Chest", "treasure_chest"), ("Archenemy", "archenemy"), ("Starter", "starter"),("Memorabilia", "memorabilia"), ("Tokens", "token") };
 
     private void UpdateDownloadSets(string code)
     {
@@ -54,6 +54,8 @@
         App.SetFilter = e.Value.ToString() ?? "";
         StateHasChanged();
     }
+
+    private Task AuditCards() => App.AuditCards();
 
     private async Task Download()
     {

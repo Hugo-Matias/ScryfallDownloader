@@ -14,6 +14,7 @@ builder.Services.AddHttpClient<ScryfallApiClient>(client =>
 builder.Services.AddHttpClient<DownloaderService>();
 builder.Services.AddSingleton<IOService>();
 builder.Services.AddSingleton<ImageService>();
+builder.Services.AddSingleton<ForgeService>();
 
 var app = builder.Build();
 

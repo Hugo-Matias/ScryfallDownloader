@@ -6,14 +6,14 @@
             <label class="form-label" for="images-path">Images Path</label>
             <input id="images-path" class="form-control" type="text" @bind-value="Model.ImagesPath" @bind-value:event="oninput" />
             <br />
-            <label class="form-label" for="search-code">Search Code</label>
-            <input id="search-code" class="form-control" type="text" @oninput="OnSearchChanged" />
+            <label class="form-label" for="editions-path">Editions Path</label>
+            <input id="editions-path" class="form-control" type="text" @bind-value="Model.EditionsPath" @bind-value:event="oninput" />
         </div>
         <div class="col-5">
-            <label class="form-label" for="output-quality">Quality: <strong>@Model.OutputQuality</strong></label>
-            <input type="range" class="form-range" id="output-quality" @bind-value="Model.OutputQuality" @bind-value:event="oninput" min="0" max="100" step="5" />
             <div class="row options-container">
                 <div class="col-6">
+                    <label class="form-label" for="search-code">Search Code</label>
+                    <input id="search-code" class="form-control" type="text" @oninput="OnSearchChanged" />
                     <label class="form-label" for="format">Format</label>
                     <div id="format" class="row">
                         <div class="col-6">
@@ -47,6 +47,8 @@
                     </div>
                 </div>
                 <div class="col-6">
+                    <label class="form-label" for="output-quality">Quality: <strong>@Model.OutputQuality</strong></label>
+                    <input type="range" class="form-range" id="output-quality" @bind-value="Model.OutputQuality" @bind-value:event="oninput" min="0" max="100" step="5" />
                     <label class="form-label">Options</label>
                     <div class="form-check">
                         <label class="form-check-label" for="convert-jpg">Convert to JPG</label>
@@ -63,8 +65,9 @@
                 </div>
             </div>
         </div>
-        <div class="col-2 download-container">
-            <button class="btn btn-outline-success download" type="submit">Download</button>
+        <div class="col-2 download-container flex-column">
+            <button class="btn btn-outline-warning expand-btn" type="button" @onclick="() => OnAudit.InvokeAsync()">Audit</button>
+            <button class="btn btn-outline-success expand-btn" type="submit">Download</button>
         </div>
     </EditForm>
     @if (State.IsDownloading)
@@ -85,6 +88,9 @@
 
     [Parameter]
     public EventCallback<ChangeEventArgs> OnSearchChanged { get; set; }
+
+    [Parameter]
+    public EventCallback OnAudit { get; set; }
 
     [CascadingParameter]
     public DownloadStates State { get; set; }

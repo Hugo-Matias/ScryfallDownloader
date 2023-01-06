@@ -17,9 +17,10 @@
 	justify-content: center;
 }
 
-.download {
+.expand-btn {
 	width: 80%;
 	height: 70%;
+	margin: 5px;
 }
 
 .progress {

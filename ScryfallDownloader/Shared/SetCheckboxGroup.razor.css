@@ -20,3 +20,7 @@ label {
 	font-size: 1rem;
 	font-weight: bold;
 }
+
+.existing-set {
+	color: yellowgreen;
+}
