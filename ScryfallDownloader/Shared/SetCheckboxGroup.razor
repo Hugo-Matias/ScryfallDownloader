@@ -43,6 +43,8 @@
         Console.WriteLine(code);
         var set = App.ForgeData.MatchedSets.First(s => s.ScryfallCode == code);
 
+        if (set.ForgeCount == 0) return "set-empty";
+
         switch (set.State)
         {
             case MatchedSetState.Equal:

@@ -22,7 +22,7 @@ label {
 }
 
 .set-equal {
-	color: forestgreen;
+	color: limegreen;
 }
 
 .set-missing {
@@ -35,4 +35,8 @@ label {
 
 .set-unimplemented {
 	color: #fff2;
+}
+
+.set-empty {
+	color:orangered;
 }

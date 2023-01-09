@@ -182,8 +182,6 @@ namespace ScryfallDownloader.Services
 
         public async Task AuditSets(ForgeDataModel data, List<Set> sets, bool redownload)
         {
-            Dictionary<string, int> incompleteSets = new();
-
             data.ImageSets = GetLocalCardSets();
             data.Editions = await GetEditions();
             data.MatchedSets = MatchSetCodes(data, sets);

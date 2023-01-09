@@ -30,6 +30,7 @@
         Forge.SetPaths(DownloadSettings.ImagesPath, DownloadSettings.EditionsPath);
 
         await GetAllSets();
+        await AuditCards();
     }
 
     private async Task GetAllSets()
