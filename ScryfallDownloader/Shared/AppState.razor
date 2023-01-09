@@ -1,5 +1,5 @@
 ﻿@inject ScryfallApiClient Api
-@inject DownloaderService Downloader
+@inject CardDownloaderService Downloader
 @inject IOService IO
 @inject ImageService Image
 @inject ForgeService Forge
@@ -70,7 +70,7 @@
     {
         if (AllSets == null) await GetAllSets();
 
-        await Forge.AuditCards(ForgeData, AllSets);
+        await Forge.AuditSets(ForgeData, AllSets, DownloadSettings.RedownloadData);
     }
 
     private async Task<bool> SearchCardsAndAppend(string set, int page)

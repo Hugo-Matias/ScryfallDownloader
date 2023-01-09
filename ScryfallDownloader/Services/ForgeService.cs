@@ -1,4 +1,5 @@
-﻿using ScryfallApi.Client.Models;
+﻿using ScryfallApi.Client;
+using ScryfallApi.Client.Models;
 using ScryfallDownloader.Models;
 using System.Text.RegularExpressions;
 
@@ -7,13 +8,16 @@ namespace ScryfallDownloader.Services
     public class ForgeService
     {
         private readonly IOService _ioService;
-
+        private readonly ScryfallApiClient _api;
+        private readonly DataDownloaderService _dataDownloader;
         private string _imagesPath;
         private string _editionsPath;
 
-        public ForgeService(IOService ioService)
+        public ForgeService(IOService ioService, ScryfallApiClient api, DataDownloaderService dataDownloader)
         {
             _ioService = ioService;
+            _api = api;
+            _dataDownloader = dataDownloader;
         }
 
         public void SetPaths(string imagesPath, string editionsPath)
@@ -176,80 +180,74 @@ namespace ScryfallDownloader.Services
             return card;
         }
 
-        public async Task AuditCards(ForgeDataModel data, List<Set> sets)
+        public async Task AuditSets(ForgeDataModel data, List<Set> sets, bool redownload)
         {
             Dictionary<string, int> incompleteSets = new();
 
-            List<string> implemented = new();
-            List<string> unimplemented = new();
-            var cardsPath = @"E:\Jogos\Magic the Gathering\Forge\res\cardsfolder\cardsfolder";
-            foreach (var dir in Directory.GetDirectories(cardsPath))
-            {
-                foreach (var file in Directory.GetFiles(dir, "*.txt"))
-                {
-                    var lines = File.ReadAllLines(file);
-
-                    var name = lines.First(l => l.StartsWith("Name:")).Split(':', 2, _splitOptions)[1];
-                    implemented.Add(name.ToLower());
-                }
-            }
-
-            int cardCount = 0;
-
             data.ImageSets = GetLocalCardSets();
             data.Editions = await GetEditions();
+            data.MatchedSets = MatchSetCodes(data, sets);
 
-            var orderedSets = data.Editions.OrderBy(s => s.Type);
-            Dictionary<string, int> types = new();
+            //var cards = _ioService.GetCardsData();
+            //if (cards == null || redownload)
+            //{
+            //    var bulkData = await _api.BulkData.Get();
+            //    var defaultCards = bulkData.Data.First(x => x.Type == "default_cards");
+            //    await _dataDownloader.DownloadJsonData(defaultCards.DownloadUri.LocalPath);
+            //    cards = _ioService.GetCardsData();
+            //}
 
-            foreach (var edition in orderedSets)
+            //CheckUnimplementedForDevelopment(data);
+
+            foreach (var set in data.MatchedSets)
             {
-                if (!types.ContainsKey(edition.Type))
-                {
-                    types.Add(edition.Type, 0);
-                }
-                foreach (var card in edition.Cards)
-                {
-                    var cardName = card.Name.Contains(" // ") ? card.Name.Split(" // ")[0] : card.Name;
-                    if (implemented.Contains(cardName.ToLower()))
-                        types[edition.Type]++;
-                    else
-                        unimplemented.Add($"{edition.Type} | {edition.Code} - {card.Name}");
-                }
-
-                if (edition.Type != "Other") cardCount += edition.Cards.Count;
-                //Console.WriteLine($"{edition.Type} | {edition.Code}: {edition.Name} - {edition.Cards.Count}");
+                if (set.State == MatchedSetState.Equal) Console.WriteLine($"Forge: {set.ForgeCode} - {set.ForgeCount} | Scryfall: {set.ScryfallCode} - {set.ScryfallCount}");
             }
+        }
 
-            File.WriteAllLines("_unimplemented.txt", unimplemented);
+        private List<MatchedSetModel> MatchSetCodes(ForgeDataModel data, List<Set> sets)
+        {
+            List<MatchedSetModel> matchedSets = new();
 
-            foreach (var k in types)
-            {
-                Console.WriteLine($"{k.Key} - {k.Value}");
-            }
             foreach (var edition in data.Editions)
             {
-                List<string> editionCodes = new();
+                MatchedSetModel match = new();
 
-                editionCodes.Add(edition.Code.ToLower());
-                if (edition.Code2 != null && !editionCodes.Contains(edition.Code2.ToLower())) editionCodes.Add(edition.Code2.ToLower());
-                if (edition.Alias != null && !editionCodes.Contains(edition.Alias.ToLower())) editionCodes.Add(edition.Alias.ToLower());
-                if (edition.ScryfallCode != null && !editionCodes.Contains(edition.ScryfallCode.ToLower())) editionCodes.Add(edition.ScryfallCode.ToLower());
+                if (!string.IsNullOrWhiteSpace(edition.ScryfallCode))
+                {
+                    // Check if the ScryfallCode set mentioned in the Edition file actually exists
+                    if (!sets.Any(s => s.Code.ToLower() == edition.ScryfallCode.ToLower())) Console.WriteLine($"MISSING SET: {edition.ScryfallCode}");
+                    else match.ScryfallCode = edition.ScryfallCode.ToLower();
+                }
+                else
+                {
+                    // If the Edition doesn't indicate any ScryfallCode, try Code instead
+                    if (sets.Any(s => s.Code.ToLower() == edition.Code.ToLower())) match.ScryfallCode = edition.Code.ToLower();
+                }
 
-                if (!data.ImageSets.Any(s => editionCodes.Contains(s.Key))) { incompleteSets.Add(edition.Code, edition.Cards.Count); continue; }
+                // If an Edition file includes a Code2 field, that's what the game will use as pic folder path, it uses Code otherwise.
+                if (!string.IsNullOrWhiteSpace(match.ScryfallCode))
+                    match.ForgeCode = (edition.Code2 != null ? edition.Code2 : edition.Code).ToLower();
 
-                // If the local edition is not found on Scryfall. This typically means it's a custom one.
-                if (sets.Count(s => s.Code.ToLower() == (edition.ScryfallCode != null ? edition.ScryfallCode.ToLower() : edition.Code.ToLower())) == 0) continue;
+                // Get card count stats for both sets
+                if (sets.Any(s => s.Code == match.ScryfallCode))
+                    match.ScryfallCount = sets.First(s => s.Code == match.ScryfallCode).card_count;
 
-                var set = sets.Single(s => s.Code.ToLower() == (edition.ScryfallCode != null ? edition.ScryfallCode.ToLower() : edition.Code.ToLower()));
-                var localSet = data.ImageSets.First(s => editionCodes.Contains(s.Key));
-                //var localSet = data.ImageSets.Single(s => s.Key.ToLower() == edition.Code.ToLower());
+                if (!string.IsNullOrWhiteSpace(match.ForgeCode) && data.ImageSets.ContainsKey(match.ForgeCode))
+                    match.ForgeCount = data.ImageSets[match.ForgeCode].Count;
 
-                if (edition.Cards == null) { Console.Write(edition.Code); continue; }
-                if (edition.Cards.Count > localSet.Value.Count) incompleteSets.Add(edition.Code, edition.Cards.Count - localSet.Value.Count);
+                if (match.ScryfallCount > 0)
+                {
+                    if (match.ScryfallCount == match.ForgeCount) match.State = MatchedSetState.Equal;
+                    else if (match.ScryfallCount > match.ForgeCount) match.State = MatchedSetState.Missing;
+                    else if (match.ScryfallCount < match.ForgeCount) match.State = MatchedSetState.Extra;
+                }
+
+                if (!string.IsNullOrWhiteSpace(match.ForgeCode) || !string.IsNullOrWhiteSpace(match.ScryfallCode))
+                    matchedSets.Add(match);
             }
 
-            //var orderedSets = incompleteSets.OrderByDescending(s => s.Value);
+            return matchedSets;
         }
 
         /// <summary>
@@ -292,6 +290,59 @@ namespace ScryfallDownloader.Services
 
             File.WriteAllLines("_sections.txt", _sections.OrderByDescending(x => x.Value).Select(x => $"{x.Key} - {x.Value}").ToArray());
             File.WriteAllLines("_metadataFields.txt", _metadataFields.OrderByDescending(x => x.Value).Select(x => $"{x.Key} - {x.Value}").ToArray());
+        }
+        /// <summary>
+        /// For development only!
+        /// Checks implemented card scripts and groups them by Set Type. Use ingame type counts in Deck Editor.
+        /// </summary>
+        private void CheckUnimplementedForDevelopment(ForgeDataModel data)
+        {
+            List<string> implemented = new();
+            List<string> unimplemented = new();
+
+            var cardsPath = @"E:\Jogos\Magic the Gathering\Forge\res\cardsfolder\cardsfolder";
+
+            foreach (var dir in Directory.GetDirectories(cardsPath))
+            {
+                foreach (var file in Directory.GetFiles(dir, "*.txt"))
+                {
+                    var lines = File.ReadAllLines(file);
+
+                    var name = lines.First(l => l.StartsWith("Name:")).Split(':', 2, _splitOptions)[1];
+                    implemented.Add(name.ToLower());
+                }
+            }
+
+            int cardCount = 0;
+            var orderedSets = data.Editions.OrderBy(s => s.Type);
+
+            Dictionary<string, int> types = new();
+
+            foreach (var edition in orderedSets)
+            {
+                if (!types.ContainsKey(edition.Type))
+                {
+                    types.Add(edition.Type, 0);
+                }
+                foreach (var card in edition.Cards)
+                {
+                    var cardName = card.Name.Contains(" // ") ? card.Name.Split(" // ")[0] : card.Name;
+                    if (implemented.Contains(cardName.ToLower()))
+                        types[edition.Type]++;
+                    else
+                        unimplemented.Add($"{edition.Type} | {edition.Code} - {card.Name}");
+                }
+
+                if (edition.Type != "Other") cardCount += edition.Cards.Count;
+                //Console.WriteLine($"{edition.Type} | {edition.Code}: {edition.Name} - {edition.Cards.Count}");
+            }
+
+            File.WriteAllLines("_unimplemented.txt", unimplemented);
+
+            foreach (var k in types)
+            {
+                Console.WriteLine($"{k.Key} - {k.Value}");
+            }
         }
     }
 }

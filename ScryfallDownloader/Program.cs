@@ -11,7 +11,8 @@ builder.Services.AddHttpClient<ScryfallApiClient>(client =>
 {
     client.BaseAddress = new Uri("https://api.scryfall.com");
 });
-builder.Services.AddHttpClient<DownloaderService>();
+builder.Services.AddHttpClient<CardDownloaderService>();
+builder.Services.AddHttpClient<DataDownloaderService>();
 builder.Services.AddSingleton<IOService>();
 builder.Services.AddSingleton<ImageService>();
 builder.Services.AddSingleton<ForgeService>();

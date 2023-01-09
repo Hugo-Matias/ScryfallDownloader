@@ -1,10 +1,10 @@
 ﻿namespace ScryfallDownloader.Services
 {
-    public class DownloaderService
+    public class CardDownloaderService
     {
         private readonly HttpClient _httpClient;
 
-        public DownloaderService(HttpClient httpClient)
+        public CardDownloaderService(HttpClient httpClient)
         {
             _httpClient = httpClient;
             _httpClient.BaseAddress = new Uri("https://cards.scryfall.io/");

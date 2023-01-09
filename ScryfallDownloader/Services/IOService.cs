@@ -1,4 +1,7 @@
-﻿namespace ScryfallDownloader.Services
+﻿using ScryfallApi.Client.Models;
+using System.Text.Json;
+
+namespace ScryfallDownloader.Services
 {
     public class IOService
     {
@@ -11,5 +14,11 @@
         public List<string> GetRelativeDirectories(string path) => Directory.GetDirectories(path).Select(d => Path.GetRelativePath(path, d)).ToList();
 
         public List<string> GetFilesInDirectory(string path) => Directory.GetFiles(path).ToList();
+
+        public List<Card>? GetCardsData()
+        {
+            if (!File.Exists("cards.json")) return null;
+            return JsonSerializer.Deserialize<List<Card>>(File.ReadAllText("cards.json"));
+        }
     }
 }

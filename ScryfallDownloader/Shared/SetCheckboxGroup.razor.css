@@ -21,6 +21,18 @@ label {
 	font-weight: bold;
 }
 
-.existing-set {
-	color: yellowgreen;
+.set-equal {
+	color: forestgreen;
+}
+
+.set-missing {
+	color: yellow;
+}
+
+.set-extra {
+	color: cyan;
+}
+
+.set-unimplemented {
+	color: #fff2;
 }

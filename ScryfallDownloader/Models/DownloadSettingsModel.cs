@@ -22,5 +22,6 @@ namespace ScryfallDownloader.Models
         public string Format { get; set; } = "png";
         public bool IgnoreExisting { get; set; } = false;
         public bool RemoveExisting { get; set; } = false;
+        public bool RedownloadData { get; set; } = false;
     }
 }
