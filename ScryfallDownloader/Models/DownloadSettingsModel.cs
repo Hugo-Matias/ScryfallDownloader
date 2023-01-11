@@ -23,5 +23,7 @@ namespace ScryfallDownloader.Models
         public bool IgnoreExisting { get; set; } = false;
         public bool RemoveExisting { get; set; } = false;
         public bool RedownloadData { get; set; } = false;
+        public bool PngHighresOnly { get; set; } = true;
+        public bool InstantDownload { get; set; } = true;
     }
 }

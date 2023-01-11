@@ -1,15 +1,15 @@
 ﻿@if (!string.IsNullOrWhiteSpace(App.SetFilter) && Sets.Count(s => s.Code.Contains(App.SetFilter.ToLower()) && s.SetType == Type) == 0) return;
 
 <lead>@Title</lead>
-<ul class="list-group">
+<ul class="list-group @(string.IsNullOrWhiteSpace(Type) ? "" : "scroll-group")">
     @foreach (var set in Sets)
     {
         if (!string.IsNullOrEmpty(App.SetFilter) && !set.Code.Contains(App.SetFilter.ToLower())) continue;
 
-        if (set.SetType == Type)
+        if (string.IsNullOrWhiteSpace(Type) || set.SetType == Type)
         {
             <li class="list-group-item">
-                <input class="form-check-input me-1" type="checkbox" id="@set.Code-check" @oninput="@(async (e) => await OnCheckboxChanged.InvokeAsync(set.Code))" checked="@App.DownloadSettings.Sets.Contains(set.Code)">
+                <input class="form-check-input me-1" type="checkbox" id="@set.Code-check" @oninput="@(async (e) => await OnCheckboxChanged.InvokeAsync(set.Code))" checked="@App.DownloadSettings.Sets.Contains(set.Code)" data-bs-toggle="modal" data-bs-target="#download-cards-modal">
                 <label class="form-check-label @(SetState(set.Code.ToLower()))" for="@set.Code-check"><span class="code">@set.Code.ToUpper()</span> - @set.Name <small>@(!string.IsNullOrWhiteSpace(set.MtgoCode) && set.MtgoCode != set.Code ? $"({set.MtgoCode})" : "")</small></label>
             </li>
         }
@@ -40,7 +40,6 @@
         // Missing sets from a populated MatchedSets list means that there is no Forge edition available for the Scryfall set being iterated
         if (!App.ForgeData.MatchedSets.Any(s => s.ScryfallCode == code)) return "set-unimplemented";
 
-        Console.WriteLine(code);
         var set = App.ForgeData.MatchedSets.First(s => s.ScryfallCode == code);
 
         if (set.ForgeCount == 0) return "set-empty";

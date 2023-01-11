@@ -29,8 +29,9 @@
         DownloadSettings.EditionsPath = @"E:\Jogos\Magic the Gathering\Forge\res\editions";
         Forge.SetPaths(DownloadSettings.ImagesPath, DownloadSettings.EditionsPath);
 
+        await Forge.GetCardsData();
         await GetAllSets();
-        await AuditCards();
+        await AuditSets();
     }
 
     private async Task GetAllSets()
@@ -41,7 +42,7 @@
 
     public async Task GetCards()
     {
-        if (DownloadSettings.Sets.Count <= 0) return;
+        if (DownloadSettings.Sets.Count == 0) return;
 
         DownloadSettings.Cards.Clear();
 
@@ -67,11 +68,30 @@
         state.TotalCards = DownloadSettings.Cards.Count();
     }
 
-    public async Task AuditCards()
+    public async Task AuditSets()
     {
         if (AllSets == null) await GetAllSets();
 
-        await Forge.AuditSets(ForgeData, AllSets, DownloadSettings.RedownloadData);
+        await Forge.AuditSets(ForgeData, AllSets);
+    }
+
+    public async Task AuditCards(string code)
+    {
+        await Forge.AuditCards(ForgeData ,code, DownloadSettings.RedownloadData);
+
+        //if(matchedCards != null)
+        //    DownloadSettings.Cards.AddRange(matchedCards);
+    }
+
+    public void RemoveAuditedSet(string code)
+    {
+        if (ForgeData.ImplementedCards.Count == 0 && ForgeData.MissingCards.Count == 0) return;
+
+        if (ForgeData.ImplementedCards.Count > 0)
+            ForgeData.ImplementedCards = ForgeData.ImplementedCards.Where(c => c.Set != code).ToList();
+
+        if (ForgeData.MissingCards.Count > 0)
+            ForgeData.MissingCards = ForgeData.MissingCards.Where(c => c.Set != code).ToList();
     }
 
     private async Task<bool> SearchCardsAndAppend(string set, int page)
@@ -100,6 +120,8 @@
     {
         state.IsDownloading = true;
 
+        DownloadSettings.Cards = ForgeData.ImplementedCards;
+
         _currentSet = DownloadSettings.Cards[0].Set;
         var setPath = CheckDirectory(_currentSet);
 
@@ -118,42 +140,49 @@
                 {
                     var cardPath = Path.Combine(setPath, $"{ParseCardName(card, face)}.full.{saveFormat}");
 
-                    if (SetFilter == "instant")
-                        SaveImage(face.ImageUris, cardPath);
+                    if (DownloadSettings.InstantDownload)
+                        SaveImage(face.ImageUris, cardPath, card.HighresImage);
                     else
-                        await SaveImage(face.ImageUris, cardPath);
+                        await SaveImage(face.ImageUris, cardPath, card.HighresImage);
                 }
             }
             else
             {
                 var cardPath = Path.Combine(setPath, $"{ParseCardName(card)}.full.{saveFormat}");
 
-                if (SetFilter == "instant")
-                    SaveImage(card.ImageUris, cardPath);
+                if (DownloadSettings.InstantDownload)
+                    SaveImage(card.ImageUris, cardPath, card.HighresImage);
                 else
-                    await SaveImage(card.ImageUris, cardPath);
+                    await SaveImage(card.ImageUris, cardPath, card.HighresImage);
             }
         }
 
         state.IsDownloading = false;
         _duplicatePrints.Clear();
+        DownloadSettings.Cards.Clear();
+        ForgeData.ImplementedCards.Clear();
+        ForgeData.MissingCards.Clear();
     }
 
-    private async Task SaveImage(Dictionary<string, Uri> uris, string path)
+    private async Task SaveImage(Dictionary<string, Uri> uris, string path, bool highres)
     {
         if (File.Exists(path) && DownloadSettings.IgnoreExisting) return;
-        if (uris == null || uris[DownloadSettings.Format] == null) return;
 
-        var data = await Downloader.DownloadImage(uris[DownloadSettings.Format].AbsoluteUri);
+        var format = DownloadSettings.PngHighresOnly && DownloadSettings.Format == "png" && !highres ? "border_crop" : DownloadSettings.Format;
+        if (uris == null || uris[format] == null) return;
 
-        if (DownloadSettings.ConvertToJpg && DownloadSettings.Format == "png")
+        var data = await Downloader.DownloadImage(uris[format].AbsoluteUri);
+
+        if (DownloadSettings.ConvertToJpg && format == "png")
             data = Image.ConvertToJpg(data, DownloadSettings.OutputQuality);
 
         await IO.SaveFile(path, data);
     }
 
-    private string CheckDirectory(string set)
+    private string CheckDirectory(string scryfallSet)
     {
+        var set = ForgeData.MatchedSets.First(s => s.ScryfallCode == scryfallSet).ForgeCode;
+
         var path = Path.Combine(DownloadSettings.ImagesPath, set);
 
         if (Directory.Exists(path) && DownloadSettings.RemoveExisting)
@@ -161,7 +190,7 @@
 
         IO.CreateDirectory(path);
 
-        _currentSet = set;
+        _currentSet = scryfallSet;
 
         return path;
     }
@@ -183,9 +212,6 @@
             cardName = cardName + count;
         }
 
-        // Split cards
-        cardName = cardName.Replace(@" // ", "");
-
-        return cardName;
+        return ParsingHelper.ParseCardname(cardName, true);
     }
 }

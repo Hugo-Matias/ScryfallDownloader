@@ -2,16 +2,16 @@
 
 <div class="settings row">
     <EditForm Model="Model" OnValidSubmit="OnSubmit" class="row">
-        <div class="col-5">
+        <div class="col-4">
             <label class="form-label" for="images-path">Images Path</label>
             <input id="images-path" class="form-control" type="text" @bind-value="Model.ImagesPath" @bind-value:event="oninput" />
             <br />
             <label class="form-label" for="editions-path">Editions Path</label>
             <input id="editions-path" class="form-control" type="text" @bind-value="Model.EditionsPath" @bind-value:event="oninput" />
         </div>
-        <div class="col-5">
+        <div class="col-6">
             <div class="row options-container">
-                <div class="col-6">
+                <div class="col-5">
                     <label class="form-label" for="search-code">Search Code</label>
                     <input id="search-code" class="form-control" type="text" @oninput="OnSearchChanged" />
                     <label class="form-label" for="format">Format</label>
@@ -46,25 +46,39 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-6">
+                <div class="col-7">
                     <label class="form-label" for="output-quality">Quality: <strong>@Model.OutputQuality</strong></label>
                     <input type="range" class="form-range" id="output-quality" @bind-value="Model.OutputQuality" @bind-value:event="oninput" min="0" max="100" step="5" />
                     <label class="form-label">Options</label>
-                    <div class="form-check">
-                        <label class="form-check-label" for="convert-jpg">Convert to JPG</label>
-                        <input type="checkbox" class="form-check-input" id="convert-jpg" @bind-value="Model.ConvertToJpg" checked="@Model.ConvertToJpg" />
-                    </div>
-                    <div class="form-check">
-                        <label class="form-check-label" for="ignore">Ignore Existing</label>
-                        <input type="checkbox" class="form-check-input" id="ignore" @bind-value="Model.IgnoreExisting" checked="@Model.IgnoreExisting" />
-                    </div>
-                    <div class="form-check">
-                        <label class="form-check-label" for="remove">Remove Existing</label>
-                        <input type="checkbox" class="form-check-input" id="remove" @bind-value="Model.RemoveExisting" checked="@Model.RemoveExisting" />
-                    </div>
-                    <div class="form-check">
-                        <label class="form-check-label" for="redownload">Re-Download Data</label>
-                        <input type="checkbox" class="form-check-input" id="redownload" @bind-value="Model.RedownloadData" checked="@Model.RedownloadData" />
+                    <div class="row">
+                        <div class="col-6">
+                            <div class="form-check">
+                                <label class="form-check-label" for="convert-jpg">Convert to JPG</label>
+                                <input type="checkbox" class="form-check-input" id="convert-jpg" @bind-value="Model.ConvertToJpg" checked="@Model.ConvertToJpg" />
+                            </div>
+                            <div class="form-check">
+                                <label class="form-check-label" for="png-highres">PNG Highres Only</label>
+                                <input type="checkbox" class="form-check-input" id="png-highres" @bind-value="Model.PngHighresOnly" checked="@Model.PngHighresOnly" />
+                            </div>
+                            <div class="form-check">
+                                <label class="form-check-label" for="redownload">Re-Download Data</label>
+                                <input type="checkbox" class="form-check-input" id="redownload" @bind-value="Model.RedownloadData" checked="@Model.RedownloadData" />
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="form-check">
+                                <label class="form-check-label" for="instant">Instant Download</label>
+                                <input type="checkbox" class="form-check-input" id="instant" @bind-value="Model.InstantDownload" checked="@Model.InstantDownload" />
+                            </div>
+                            <div class="form-check">
+                                <label class="form-check-label" for="ignore">Ignore Existing</label>
+                                <input type="checkbox" class="form-check-input" id="ignore" @bind-value="Model.IgnoreExisting" checked="@Model.IgnoreExisting" />
+                            </div>
+                            <div class="form-check">
+                                <label class="form-check-label" for="remove">Remove Existing</label>
+                                <input type="checkbox" class="form-check-input" id="remove" @bind-value="Model.RemoveExisting" checked="@Model.RemoveExisting" />
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

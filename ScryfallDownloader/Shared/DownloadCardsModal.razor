@@ -1,0 +1,88 @@
+﻿<div class="modal fade" id="download-cards-modal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">@(SetCode.ToUpper())</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                @if (App.ForgeData.MissingCards.Count(c => c.Set == SetCode) > 0)
+                {
+                    <h1 class="missing">Missing Cards: <span class="count">@App.ForgeData.MissingCards.Count(c => c.Set == SetCode)</span></h1>
+                    <ul class="list-group">
+                        @foreach (var card in App.ForgeData.MissingCards.OrderBy(c => c.Name))
+                        {
+                            if (card.Set == SetCode)
+                            {
+                                <li class="list-group-item @card.Rarity">
+                                    @if (CheckLocalFile(card.Name))
+                                    {
+                                        <span class="local oi oi-check"></span>
+                                    }
+                                    @card.CollectorNumber | @(ParseRarity(card.Rarity)) - @card.Name @(card.Layout != "normal" ? $"({card.Layout})" : "")
+                                </li>
+                            }
+                        }
+                    </ul>
+                }
+                else
+                {
+                    <h1 class="missing">No Missing Cards!</h1>
+                }
+                <br />
+                @if (App.ForgeData.ImplementedCards.Count(c => c.Set == SetCode) > 0)
+                {
+                    <h1 class="implemented">Implemented Cards: <span class="count">@App.ForgeData.ImplementedCards.Count(c => c.Set == SetCode)</span></h1>
+                    <ul class="list-group">
+                        @foreach (var card in App.ForgeData.ImplementedCards.OrderBy(c => c.Name))
+                        {
+                            if (card.Set == SetCode)
+                            {
+                                <li class="list-group-item @card.Rarity">
+                                    @if (CheckLocalFile(card.Name))
+                                    {
+                                        <span class="local oi oi-check"></span>
+                                    }
+                                    @card.CollectorNumber | @(ParseRarity(card.Rarity)) - @card.Name @(card.Layout != "normal" ? $"({card.Layout})" : "")
+                                </li>
+                            }
+                        }
+                    </ul>
+                }
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                @*<button type="button" class="btn btn-primary">Save changes</button>*@
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [CascadingParameter]
+    public AppState App { get; set; }
+
+    [Parameter]
+    public string SetCode { get; set; }
+
+    private string ParseRarity(string rarity)
+    {
+        switch (rarity)
+        {
+            case "common":
+                return "C";
+            case "uncommon":
+                return "U";
+            case "rare":
+                return "R";
+            case "mythic":
+                return "M";
+            case "land":
+                return "L";
+            default:
+                return "S";
+        }
+    }
+
+    private bool CheckLocalFile(string cardName) => App.ForgeData.ImageSets[SetCode].Any(c => c.Contains(ParsingHelper.ParseCardname(cardName, true)));
+}

@@ -1,5 +1,6 @@
 ﻿using ScryfallApi.Client;
 using ScryfallApi.Client.Models;
+using ScryfallDownloader.Extensions;
 using ScryfallDownloader.Models;
 using System.Text.RegularExpressions;
 
@@ -12,6 +13,7 @@ namespace ScryfallDownloader.Services
         private readonly DataDownloaderService _dataDownloader;
         private string _imagesPath;
         private string _editionsPath;
+        private List<Card> _cards;
 
         public ForgeService(IOService ioService, ScryfallApiClient api, DataDownloaderService dataDownloader)
         {
@@ -180,27 +182,18 @@ namespace ScryfallDownloader.Services
             return card;
         }
 
-        public async Task AuditSets(ForgeDataModel data, List<Set> sets, bool redownload)
+        public async Task AuditSets(ForgeDataModel data, List<Set> sets)
         {
             data.ImageSets = GetLocalCardSets();
             data.Editions = await GetEditions();
             data.MatchedSets = MatchSetCodes(data, sets);
 
-            //var cards = _ioService.GetCardsData();
-            //if (cards == null || redownload)
-            //{
-            //    var bulkData = await _api.BulkData.Get();
-            //    var defaultCards = bulkData.Data.First(x => x.Type == "default_cards");
-            //    await _dataDownloader.DownloadJsonData(defaultCards.DownloadUri.LocalPath);
-            //    cards = _ioService.GetCardsData();
-            //}
-
             //CheckUnimplementedForDevelopment(data);
 
-            foreach (var set in data.MatchedSets)
-            {
-                if (set.State == MatchedSetState.Equal) Console.WriteLine($"Forge: {set.ForgeCode} - {set.ForgeCount} | Scryfall: {set.ScryfallCode} - {set.ScryfallCount}");
-            }
+            //foreach (var set in data.MatchedSets)
+            //{
+            //    if (set.State == MatchedSetState.Equal) Console.WriteLine($"Forge: {set.ForgeCode} - {set.ForgeCount} | Scryfall: {set.ScryfallCode} - {set.ScryfallCount}");
+            //}
         }
 
         private List<MatchedSetModel> MatchSetCodes(ForgeDataModel data, List<Set> sets)
@@ -246,6 +239,44 @@ namespace ScryfallDownloader.Services
             }
 
             return matchedSets;
+        }
+
+        public async Task AuditCards(ForgeDataModel data, string code, bool redownload)
+        {
+            await GetCardsData(redownload);
+
+            var matchedSet = data.MatchedSets.FirstOrDefault(s => s.ScryfallCode == code, null);
+
+            // Prevents from downloading unimplemented sets. Temporary Solution.
+            if (matchedSet == null) return;
+
+            var forgeEdition = data.Editions.First(s => (s.Code2 != null && s.Code2.ToLower() == matchedSet.ForgeCode) || s.Code.ToLower() == matchedSet.ForgeCode);
+
+            var matchedCards = _cards.Where(c => c.Set == code).ToList();
+
+            // Order by integer converted CollectorNumber. Some CNs have non-digit characters and this will enable natural sorting for all the cards.
+            foreach (var card in matchedCards.OrderBy(c => int.Parse(new String(c.CollectorNumber.Where(Char.IsDigit).ToArray()))))
+            {
+                var isImplemented = forgeEdition.Cards.Any(c => ParsingHelper.ParseCardname(card.Name).Contains(c.Name));
+
+                if (isImplemented) data.ImplementedCards.Add(card);
+                else data.MissingCards.Add(card);
+            }
+        }
+
+        public async Task GetCardsData(bool redownload = false)
+        {
+            if (_cards != null && _cards.Count > 0 && !redownload) return;
+
+            _cards = _ioService.GetCardsData();
+
+            if (_cards == null || redownload)
+            {
+                var bulkData = await _api.BulkData.Get();
+                var defaultCards = bulkData.Data.First(x => x.Type == "default_cards");
+                await _dataDownloader.DownloadJsonData(defaultCards.DownloadUri.LocalPath);
+                _cards = _ioService.GetCardsData();
+            }
         }
 
         /// <summary>

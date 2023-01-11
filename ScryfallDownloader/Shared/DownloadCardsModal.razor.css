@@ -1,0 +1,44 @@
+﻿.modal {
+	--app-modal-border-color: #444;
+	--bs-modal-bg: #222;
+	--bs-modal-border-color: var(--app-modal-border-color);
+	--bs-modal-header-border-color: var(--app-modal-border-color);
+	--bs-modal-footer-border-color: var(--app-modal-border-color);
+}
+
+h1 {
+	font-size: 1.2rem;
+}
+
+.count {
+	font-family: 'FiraCode NF', monospace;
+	font-weight: bold;
+}
+
+.implemented {
+	color: lawngreen;
+}
+
+.missing {
+	color: orangered;
+}
+
+.list-group {
+	--bs-list-group-bg: #111;
+	--bs-list-group-color: white;
+}
+
+.uncommon {
+	--bs-list-group-bg: #73737355;
+}
+.rare {
+	--bs-list-group-bg: #99800055;
+}
+.mythic {
+	--bs-list-group-bg: #99290055;
+}
+
+.local {
+	color: greenyellow;
+	margin-right: 1rem;
+}

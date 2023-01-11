@@ -2,7 +2,7 @@
 
 <PageTitle>Index</PageTitle>
 
-<Settings Model="App.DownloadSettings" OnAudit="AuditCards" OnSubmit="Download" OnSearchChanged="FilterSets"></Settings>
+<Settings Model="App.DownloadSettings" OnAudit="ToggleGrouping" OnSubmit="Download" OnSearchChanged="FilterSets"></Settings>
 
 <div class="col title">
     <h1>Scryfall Sets</h1>
@@ -10,25 +10,34 @@
 </div>
 <br />
 <div class="container d-flex">
-    <div class="col-4 me-3">
-        @foreach (var edition in _group1)
-        {
-            <SetCheckboxGroup Sets="App.AllSets" OnCheckboxChanged="UpdateDownloadSets" Title="@edition.Item1" Type="@edition.Item2"/>
-        }
-    </div>
-    <div class="col-4 me-3">
-        @foreach (var edition in _group2)
-        {
-            <SetCheckboxGroup Sets="App.AllSets" OnCheckboxChanged="UpdateDownloadSets" Title="@edition.Item1" Type="@edition.Item2"/>
-        }
-    </div>
-    <div class="col-4 me-3">
-        @foreach (var edition in _group3)
-        {
-            <SetCheckboxGroup Sets="App.AllSets" OnCheckboxChanged="UpdateDownloadSets" Title="@edition.Item1" Type="@edition.Item2"/>
-        }
-    </div>
+    @if (_groupByType)
+    {
+        <div class="col-4 me-3">
+            @foreach (var edition in _group1)
+            {
+                <SetCheckboxGroup Sets="App.AllSets" OnCheckboxChanged="UpdateDownloadSets" Title="@edition.Item1" Type="@edition.Item2" />
+            }
+        </div>
+        <div class="col-4 me-3">
+            @foreach (var edition in _group2)
+            {
+                <SetCheckboxGroup Sets="App.AllSets" OnCheckboxChanged="UpdateDownloadSets" Title="@edition.Item1" Type="@edition.Item2" />
+            }
+        </div>
+        <div class="col-4 me-3">
+            @foreach (var edition in _group3)
+            {
+                <SetCheckboxGroup Sets="App.AllSets" OnCheckboxChanged="UpdateDownloadSets" Title="@edition.Item1" Type="@edition.Item2" />
+            }
+        </div>
+    }
+    else
+    {
+        <SetCheckboxGroup Sets="App.AllSets" OnCheckboxChanged="UpdateDownloadSets" Title="" Type="" />
+    }
 </div>
+
+<DownloadCardsModal SetCode="@_selectedSetCode"></DownloadCardsModal>
 
 @code {
     [CascadingParameter]
@@ -39,14 +48,24 @@
 
     private List<(string, string)> _group2 = new() { ("Expansions", "expansion"), ("Masterpiece", "masterpiece"), ("Spellbook", "spellbook"), ("Draft", "draft_innovation"), ("Planechase", "planechase"), ("Funny", "funny"), ("Promo", "promo") };
 
-    private List<(string, string)> _group3 = new() { ("Masters", "masters"), ("Arsenal", "arsenal"), ("Premium Deck", "premium_deck"), ("MTGO Treasure Chest", "treasure_chest"), ("Archenemy", "archenemy"), ("Starter", "starter"),("Memorabilia", "memorabilia"), ("Tokens", "token") };
+    private List<(string, string)> _group3 = new() { ("Masters", "masters"), ("Arsenal", "arsenal"), ("Premium Deck", "premium_deck"), ("MTGO Treasure Chest", "treasure_chest"), ("Archenemy", "archenemy"), ("Starter", "starter"), ("Memorabilia", "memorabilia"), ("Tokens", "token") };
 
-    private void UpdateDownloadSets(string code)
+    private bool _groupByType = true;
+    private string _selectedSetCode = "SET CODE";
+
+    private async Task UpdateDownloadSets(string code)
     {
         if (App.DownloadSettings.Sets.Contains(code))
+        {
             App.DownloadSettings.Sets.Remove(code);
+            App.RemoveAuditedSet(code);
+        }
         else
+        {
             App.DownloadSettings.Sets.Add(code);
+            await App.AuditCards(code);
+        }
+        _selectedSetCode = code;
     }
 
     private void FilterSets(ChangeEventArgs e)
@@ -55,11 +74,20 @@
         StateHasChanged();
     }
 
-    private Task AuditCards() => App.AuditCards();
+    private void ToggleGrouping()
+    {
+        _groupByType = !_groupByType;
+        StateHasChanged();
+    }
+
+    private Task AuditSets() => App.AuditSets();
 
     private async Task Download()
     {
-        await App.GetCards();
+        //await App.GetCards();
         await App.DownloadImages();
+        App.DownloadSettings.Sets.Clear();
+        await AuditSets();
+        StateHasChanged();
     }
 }
