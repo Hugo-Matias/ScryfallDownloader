@@ -1,8 +1,8 @@
-﻿@page "/"
+﻿@page "/downloader"
 
-<PageTitle>Index</PageTitle>
+<PageTitle>Set Downloader</PageTitle>
 
-<Settings Model="App.DownloadSettings" OnAudit="ToggleGrouping" OnSubmit="Download" OnSearchChanged="FilterSets"></Settings>
+<Settings Model="App.DownloadSettings" OnSortBy="ToggleSorting" OnSubmit="Download" OnSearchChanged="FilterSets" OnHideChanged="StateHasChanged"></Settings>
 
 <div class="col title">
     <h1>Scryfall Sets</h1>
@@ -33,7 +33,7 @@
     }
     else
     {
-        <SetCheckboxGroup Sets="App.AllSets" OnCheckboxChanged="UpdateDownloadSets" Title="" Type="" />
+        <SetCheckboxGroup Sets="App.AllSets" OnCheckboxChanged="UpdateDownloadSets" Title="Release Date" Type="" />
     }
 </div>
 
@@ -74,7 +74,7 @@
         StateHasChanged();
     }
 
-    private void ToggleGrouping()
+    private void ToggleSorting()
     {
         _groupByType = !_groupByType;
         StateHasChanged();

@@ -1,0 +1,107 @@
+﻿@page "/"
+@using System.Text.RegularExpressions;
+
+<PageTitle>Deck Builder</PageTitle>
+
+<h3>Deck Builder</h3>
+<br />
+<div class="row">
+    <div class="col-6">
+        <label for="import-area" class="form-label">Import Text:</label>
+        <textarea class="form-control" id="import-area" rows="30" @bind-value="@_importText" @bind-value:event="oninput"></textarea>
+    </div>
+    <div class="col-6">
+        @if (_deckCards.Count > 0)
+        {
+            <ul class="list-group">
+            @foreach(var card in _deckCards)
+            {
+               <li class="list-group-item" >@card.Quantity - @card.Name | @card.Set@(!string.IsNullOrWhiteSpace(card.CollectorNumber) ? $" | {card.CollectorNumber}" : "")</li>
+            }
+            </ul>
+        }
+    </div>
+
+</div>
+
+<label for="before-date" class="form-label">Sets Released Before:</label>
+<input type="date" class="form-control" id="before-date" @bind-value="_beforeReleaseDate" />
+
+<button @onclick="ImportDeck">TEST</button>
+
+@code {
+    [CascadingParameter]
+    public AppState App { get; set; }
+
+    private string _importText;
+    private DateOnly _beforeReleaseDate = DateOnly.FromDateTime(DateTime.Now);
+    private List<DeckCardModel> _deckCards = new();
+    private List<ForgeEditionModel> _allowedSets = new();
+
+    private Regex _patternMoxfield = new Regex(@"(.+?) (.+?) (\(.+?\)) (.+?$)");
+
+    private void ImportDeck()
+    {
+        _deckCards.Clear();
+        ParseImportLines();
+        GetEditions();
+        RandomizeVariants();
+    }
+
+    private void ParseImportLines()
+    {
+        int quantity;
+        string name, set, collectorsNumber;
+
+        foreach (var line in _importText.Split("\n"))
+        {
+            if (!_patternMoxfield.IsMatch(line)) continue;
+            var groups = _patternMoxfield.Matches(line)[0].Groups;
+            quantity = ParsingHelper.ParseToInt(groups[1].Value);
+            name = groups[2].Value;
+            set = Regex.Replace(groups[3].Value, @"[\(\)]", "", RegexOptions.Compiled).ToLower();
+            collectorsNumber = groups[4].Value;
+            _deckCards.Add(new DeckCardModel() { Name = name, Set = set, CollectorNumber = collectorsNumber, Quantity = quantity != int.MinValue ? quantity : 1 });
+        }
+    }
+
+    private void RandomizeVariants()
+    {
+        List<DeckCardModel> tempDecklist = new();
+
+        foreach (var card in _deckCards)
+        {
+            if (card.Variations == 1) tempDecklist.Add(card);
+            else
+            {
+                var variation = 1;
+                for (int i = 0; i < card.Quantity; i++)
+                {
+                    tempDecklist.Add(new DeckCardModel() {  } );
+                }
+            }
+        }
+    }
+
+    private void GetEditions()
+    {
+        _allowedSets.Clear();
+
+        foreach (var card in _deckCards)
+        {
+            var parsedName = ParsingHelper.ParseCardname(card.Name).ToLower();
+            var cardSets = App.ForgeData.Editions.Where(s => s.Cards.Any(c => c.Name.ToLower().Contains(parsedName)) && s.Date < _beforeReleaseDate).OrderByDescending(s => s.Date);
+
+            if(string.IsNullOrWhiteSpace(card.Set)) card.Set = cardSets.ElementAt(0).Code.ToLower();
+            card.Variations = App.ForgeData.Editions.First(s => s.Code.ToLower() == card.Set).Cards.Count(c => c.Name.ToLower().Contains(parsedName));
+
+
+            foreach (var set in cardSets)
+            {
+                if (!_allowedSets.Contains(set)) _allowedSets.Add(set);
+            }
+        }
+
+        _allowedSets.OrderByDescending(s => s.Date);
+    }
+}

@@ -14,5 +14,14 @@ namespace ScryfallDownloader.Services
                 return image.ToByteArray();
             }
         }
+
+        public byte[] Rotate180(byte[] data)
+        {
+            using (var image = new MagickImage(data))
+            {
+                image.Rotate(180);
+                return image.ToByteArray();
+            }
+        }
     }
 }

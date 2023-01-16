@@ -68,32 +68,6 @@
         state.TotalCards = DownloadSettings.Cards.Count();
     }
 
-    public async Task AuditSets()
-    {
-        if (AllSets == null) await GetAllSets();
-
-        await Forge.AuditSets(ForgeData, AllSets);
-    }
-
-    public async Task AuditCards(string code)
-    {
-        await Forge.AuditCards(ForgeData ,code, DownloadSettings.RedownloadData);
-
-        //if(matchedCards != null)
-        //    DownloadSettings.Cards.AddRange(matchedCards);
-    }
-
-    public void RemoveAuditedSet(string code)
-    {
-        if (ForgeData.ImplementedCards.Count == 0 && ForgeData.MissingCards.Count == 0) return;
-
-        if (ForgeData.ImplementedCards.Count > 0)
-            ForgeData.ImplementedCards = ForgeData.ImplementedCards.Where(c => c.Set != code).ToList();
-
-        if (ForgeData.MissingCards.Count > 0)
-            ForgeData.MissingCards = ForgeData.MissingCards.Where(c => c.Set != code).ToList();
-    }
-
     private async Task<bool> SearchCardsAndAppend(string set, int page)
     {
         try
@@ -116,11 +90,39 @@
         }
     }
 
+    public async Task AuditSets()
+    {
+        if (AllSets == null) await GetAllSets();
+
+        await Forge.AuditSets(ForgeData, AllSets);
+    }
+
+    public async Task AuditCards(string code)
+    {
+        await Forge.AuditCards(ForgeData, code, DownloadSettings.RedownloadData, DownloadSettings.IgnoreFoil, DownloadSettings.IgnoreVariations, DownloadSettings.IgnoreNonEnglish);
+    }
+
+    public void RemoveAuditedSet(string code)
+    {
+        if (ForgeData.ImplementedCards.Count == 0 && ForgeData.MissingCards.Count == 0) return;
+
+        if (ForgeData.ImplementedCards.Count > 0)
+            ForgeData.ImplementedCards = ForgeData.ImplementedCards.Where(c => c.Set != code).ToList();
+
+        if (ForgeData.MissingCards.Count > 0)
+            ForgeData.MissingCards = ForgeData.MissingCards.Where(c => c.Set != code).ToList();
+    }
+
+    private List<string> _multiFacedLayouts = new List<string>() { "transform", "modal_dfc", "reversible_card", "flip" };
+
     public async Task DownloadImages()
     {
-        state.IsDownloading = true;
-
         DownloadSettings.Cards = ForgeData.ImplementedCards;
+        if (DownloadSettings.DownloadMissing) DownloadSettings.Cards.AddRange(ForgeData.MissingCards);
+
+        state.CurrentCard = 0;
+        state.TotalCards = DownloadSettings.Cards.Count();
+        state.IsDownloading = true;
 
         _currentSet = DownloadSettings.Cards[0].Set;
         var setPath = CheckDirectory(_currentSet);
@@ -134,16 +136,28 @@
 
             var saveFormat = ParseFormat();
 
-            if (card.Layout == "transform")
+            if (_multiFacedLayouts.Contains(card.Layout) && card.CardFaces != null)
             {
                 foreach (var face in card.CardFaces)
                 {
                     var cardPath = Path.Combine(setPath, $"{ParseCardName(card, face)}.full.{saveFormat}");
+                    Dictionary<string, Uri> imageUris;
+
+                    // Flip cards have 2 card faces for each orientation but only 1 imageuris list
+                    // We need to use the card.ImageUris instead and also re-save and rotate the image for the second face
+                    var rotate = false;
+                    if (card.Layout == "flip")
+                    {
+                        imageUris = card.ImageUris;
+                        if (card.CardFaces[1] == face) rotate = true;
+                    }
+                    else
+                        imageUris = face.ImageUris;
 
                     if (DownloadSettings.InstantDownload)
-                        SaveImage(face.ImageUris, cardPath, card.HighresImage);
+                        SaveImage(imageUris, cardPath, card.HighresImage, rotate);
                     else
-                        await SaveImage(face.ImageUris, cardPath, card.HighresImage);
+                        await SaveImage(imageUris, cardPath, card.HighresImage, rotate);
                 }
             }
             else
@@ -164,7 +178,7 @@
         ForgeData.MissingCards.Clear();
     }
 
-    private async Task SaveImage(Dictionary<string, Uri> uris, string path, bool highres)
+    private async Task SaveImage(Dictionary<string, Uri> uris, string path, bool highres, bool rotate = false)
     {
         if (File.Exists(path) && DownloadSettings.IgnoreExisting) return;
 
@@ -173,17 +187,24 @@
 
         var data = await Downloader.DownloadImage(uris[format].AbsoluteUri);
 
-        if (DownloadSettings.ConvertToJpg && format == "png")
-            data = Image.ConvertToJpg(data, DownloadSettings.OutputQuality);
+        if (DownloadSettings.ConvertToJpg && format == "png") data = Image.ConvertToJpg(data, DownloadSettings.OutputQuality);
+
+        if (rotate) data = Image.Rotate180(data);
 
         await IO.SaveFile(path, data);
     }
 
     private string CheckDirectory(string scryfallSet)
     {
-        var set = ForgeData.MatchedSets.First(s => s.ScryfallCode == scryfallSet).ForgeCode;
+        // TODO: Get appropriate Set code directory for the rare cases where multiple Forge editions match to a single Scryfall set (MED and TD0).
+        var set = ForgeData.MatchedSets.FirstOrDefault(s => s.ScryfallCode == scryfallSet, null);
 
-        var path = Path.Combine(DownloadSettings.ImagesPath, set);
+        // Null MatchedSet means it's unimplemented in Forge,
+        // Using the argument's code to create a directory following Scryfall we can download the cards anyway,
+        // This is useful for token like cards (eg. Archenemy Schemes or AFR Dungeons).
+        var code = set != null ? set.ForgeCode : scryfallSet;
+
+        var path = Path.Combine(DownloadSettings.ImagesPath, code);
 
         if (Directory.Exists(path) && DownloadSettings.RemoveExisting)
             Directory.Delete(path, true);
@@ -200,6 +221,10 @@
     private string ParseCardName(Card card, CardFace? face = null)
     {
         var cardName = face == null ? card.Name : face.Name;
+
+        // Adventure layout cards will include both faces names separated by " // ",
+        // Forge will only use the first face's name, the text written on the top of the card.
+        if (card.Layout == "adventure" && cardName.Contains(" // ")) cardName = cardName.Split(" // ")[0];
 
         if (DownloadSettings.Cards.Count(c => c.Name == card.Name && c.Set == card.Set) > 1)
         {

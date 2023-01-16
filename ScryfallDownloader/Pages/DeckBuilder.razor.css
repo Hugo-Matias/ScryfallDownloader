@@ -1,0 +1,10 @@
+﻿textarea, textarea:focus {
+	background: #111;
+	border-color: #333;
+	color: white;
+}
+
+	textarea:focus {
+		box-shadow: none;
+		border-color: #555;
+	}

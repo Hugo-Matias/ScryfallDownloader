@@ -84,5 +84,11 @@
         }
     }
 
-    private bool CheckLocalFile(string cardName) => App.ForgeData.ImageSets[SetCode].Any(c => c.Contains(ParsingHelper.ParseCardname(cardName, true)));
+    private bool CheckLocalFile(string cardName)
+    {
+        if(!App.ForgeData.MatchedSets.Any(s => s.ScryfallCode == SetCode)) return false;
+        var code = App.ForgeData.MatchedSets.First(s => s.ScryfallCode == SetCode).ForgeCode;
+        if (!App.ForgeData.ImageSets.ContainsKey(code)) return false;
+        return App.ForgeData.ImageSets[code].Any(c => c.Contains(ParsingHelper.ParseCardname(cardName, true)));
+    }
 }

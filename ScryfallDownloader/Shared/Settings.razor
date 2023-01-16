@@ -61,6 +61,18 @@
                                 <input type="checkbox" class="form-check-input" id="png-highres" @bind-value="Model.PngHighresOnly" checked="@Model.PngHighresOnly" />
                             </div>
                             <div class="form-check">
+                                <label class="form-check-label" for="ignore-variation">Ignore Variations</label>
+                                <input type="checkbox" class="form-check-input" id="ignore-variation" @bind-value="@Model.IgnoreVariations" checked="@Model.IgnoreVariations" />
+                            </div>
+                            <div class="form-check">
+                                <label class="form-check-label" for="ignore-foil">Ignore Foil</label>
+                                <input type="checkbox" class="form-check-input" id="ignore-foil" @bind-value="Model.IgnoreFoil" checked="@Model.IgnoreFoil" />
+                            </div>
+                            <div class="form-check">
+                                <label class="form-check-label" for="ignore-non-english">Ignore Non-English</label>
+                                <input type="checkbox" class="form-check-input" id="ignore-non-english" @bind-value="Model.IgnoreNonEnglish" checked="@Model.IgnoreNonEnglish" />
+                            </div>
+                            <div class="form-check">
                                 <label class="form-check-label" for="redownload">Re-Download Data</label>
                                 <input type="checkbox" class="form-check-input" id="redownload" @bind-value="Model.RedownloadData" checked="@Model.RedownloadData" />
                             </div>
@@ -69,6 +81,14 @@
                             <div class="form-check">
                                 <label class="form-check-label" for="instant">Instant Download</label>
                                 <input type="checkbox" class="form-check-input" id="instant" @bind-value="Model.InstantDownload" checked="@Model.InstantDownload" />
+                            </div>
+                            <div class="form-check">
+                                <label class="form-check-label" for="download-missing">Download Missing</label>
+                                <input type="checkbox" class="form-check-input" id="download-missing" @bind-value="Model.DownloadMissing" checked="@Model.DownloadMissing" />
+                            </div>
+                            <div class="form-check">
+                                <label class="form-check-label" for="hide-unimplemented">Hide Unimplemented</label>
+                                <input type="checkbox" class="form-check-input" id="hide-unimplemented" @oninput="HandleHideChanged" checked="@_isHideUnimplemented" />
                             </div>
                             <div class="form-check">
                                 <label class="form-check-label" for="ignore">Ignore Existing</label>
@@ -84,7 +104,7 @@
             </div>
         </div>
         <div class="col-2 download-container flex-column">
-            <button class="btn btn-outline-warning expand-btn" type="button" @onclick="() => OnAudit.InvokeAsync()">Audit</button>
+            <button class="btn btn-outline-warning expand-btn" type="button" @onclick="() => OnSortBy.InvokeAsync()">Sort By</button>
             <button class="btn btn-outline-success expand-btn" type="submit">Download</button>
         </div>
     </EditForm>
@@ -92,7 +112,7 @@
     {
         <br />
         <div class="progress">
-            <div class="progress-bar" role="progressbar" style="width:@((int)((float)State.CurrentCard / (float)State.TotalCards * 100))%" aria-valuenow="@State.CurrentCard" aria-valuemin="0" aria-valuemax="@State.TotalCards"><span>@State.CurrentCard / @State.TotalCards  -  @State.CurrentCardName</span></div>
+            <div class="progress-bar" role="progressbar" style="width:@((int)(State.CurrentCard / (float)State.TotalCards * 100))%" aria-valuenow="@State.CurrentCard" aria-valuemin="0" aria-valuemax="@State.TotalCards"><span>@State.CurrentCard / @State.TotalCards  -  @State.CurrentCardName</span></div>
         </div>
     }
 </div>
@@ -108,20 +128,33 @@
     public EventCallback<ChangeEventArgs> OnSearchChanged { get; set; }
 
     [Parameter]
-    public EventCallback OnAudit { get; set; }
+    public EventCallback OnSortBy { get; set; }
+
+    [Parameter]
+    public EventCallback OnHideChanged { get; set; }
 
     [CascadingParameter]
     public DownloadStates State { get; set; }
+
+    private bool _isHideUnimplemented;
 
     protected override void OnParametersSet()
     {
         State.OnDownloadChanged += Update;
         State.OnCardDownloaded += Update;
+        _isHideUnimplemented = Model.HideUnimplemented;
     }
 
     private void Update() => StateHasChanged();
 
     private void SetFormat(string format) => Model.Format = format;
+
+    private void HandleHideChanged(ChangeEventArgs e)
+    {
+        _isHideUnimplemented = (bool)e.Value;
+        Model.HideUnimplemented = _isHideUnimplemented;
+        OnHideChanged.InvokeAsync();
+    }
 
     void IDisposable.Dispose()
     {

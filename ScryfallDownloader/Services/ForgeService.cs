@@ -155,26 +155,34 @@ namespace ScryfallDownloader.Services
                 number = groups[0];
                 rarity = groups[1];
                 name = groups[2];
-                //name = string.Join(' ', groups.ToList().GetRange(2, groups.Length - 2));
             }
             else
             {
-                var groups = line.Split(' ', 3, _splitOptions);
-                if (groups.Length > 1)
-                {
-                    // Ignore cards that don't have a CN but start with R
-                    // Other sections data is not relevant either
-                    // This will exclude every other case, so there is no need to predict a diferent combination for the 3 variables
-                    if (_cardRarities.Contains(groups[0][0]) || section != "[cards]") return null;
+                string[] groups;
 
-                    number = groups[0];
-                    rarity = groups[1];
-                    name = groups[2];
-                    //name = string.Join(' ', groups.ToList().GetRange(2, groups.Length - 2));
+                if (_cardRarities.Any(r => line.StartsWith($"{r} ")))
+                {
+                    groups = line.Split(' ', 2, _splitOptions);
+                    rarity = groups[0];
+                    name = groups[1];
                 }
-                // This excludes all lines with a single word
-                // None of them had relevant card data and all were on a non-[cards] section
-                else { return null; }
+
+                else
+                {
+                    if (section != "[cards]") return null;
+
+                    groups = line.Split(' ', 3, _splitOptions);
+
+                    if (groups.Length > 1)
+                    {
+                        number = groups[0];
+                        rarity = groups[1];
+                        name = groups[2];
+                    }
+                    // This excludes all lines with a single word
+                    // None of them had relevant card data and all were on a non-[cards] section
+                    else { return null; }
+                }
             }
 
             ForgeCardModel card = new ForgeCardModel() { Number = number, Rarity = rarity, Name = name, Artist = artist };
@@ -189,11 +197,6 @@ namespace ScryfallDownloader.Services
             data.MatchedSets = MatchSetCodes(data, sets);
 
             //CheckUnimplementedForDevelopment(data);
-
-            //foreach (var set in data.MatchedSets)
-            //{
-            //    if (set.State == MatchedSetState.Equal) Console.WriteLine($"Forge: {set.ForgeCode} - {set.ForgeCount} | Scryfall: {set.ScryfallCode} - {set.ScryfallCount}");
-            //}
         }
 
         private List<MatchedSetModel> MatchSetCodes(ForgeDataModel data, List<Set> sets)
@@ -241,25 +244,46 @@ namespace ScryfallDownloader.Services
             return matchedSets;
         }
 
-        public async Task AuditCards(ForgeDataModel data, string code, bool redownload)
+        public async Task AuditCards(ForgeDataModel data, string code, bool redownload, bool ignoreFoil, bool ignoreVariation, bool ignoreNonEnglish)
         {
             await GetCardsData(redownload);
 
-            var matchedSet = data.MatchedSets.FirstOrDefault(s => s.ScryfallCode == code, null);
+            // Some Scryfall sets match to multiple Forge editions (eg. MED), to include every possible card we need to iterate over them.
+            var matchedSets = data.MatchedSets.Where(s => s.ScryfallCode == code);
 
             // Prevents from downloading unimplemented sets. Temporary Solution.
-            if (matchedSet == null) return;
+            //if (matchedSets == null) return;
 
-            var forgeEdition = data.Editions.First(s => (s.Code2 != null && s.Code2.ToLower() == matchedSet.ForgeCode) || s.Code.ToLower() == matchedSet.ForgeCode);
+            var forgeEditions = data.Editions.Where(s => (s.Code2 != null && matchedSets.Count(m => m.ForgeCode == s.Code2.ToLower()) > 0) || matchedSets.Count(m => m.ForgeCode == s.Code.ToLower()) > 0);
 
             var matchedCards = _cards.Where(c => c.Set == code).ToList();
+            var foils = new List<Card>();
+            var specialCN = "dps★";
 
-            // Order by integer converted CollectorNumber. Some CNs have non-digit characters and this will enable natural sorting for all the cards.
-            foreach (var card in matchedCards.OrderBy(c => int.Parse(new String(c.CollectorNumber.Where(Char.IsDigit).ToArray()))))
+            // First OrderBy integer converted CN, this will enable natural sorting for all the cards, including the ones with special chars.
+            // ThenBy, will make sure identical CN's with special characters will be ordered correctly (eg. 1, 1★).
+            foreach (var card in matchedCards.OrderBy(c => ParsingHelper.ParseToInt(c.CollectorNumber)).ThenBy(c => c.CollectorNumber))
             {
-                var isImplemented = forgeEdition.Cards.Any(c => ParsingHelper.ParseCardname(card.Name).Contains(c.Name));
+                // TODO: Better logic to handle foils,
+                // Current implementation works for some particular sets where Scryfall's data doesn't match with Forge editions (eg. 10E)
+                //if (ignoreFoil && card.Finishes.Contains("foil")) { foils.Add(card); continue; }
+                if (ignoreFoil && card.CollectorNumber.Any(specialCN.Contains)) { foils.Add(card); continue; }
 
-                if (isImplemented) data.ImplementedCards.Add(card);
+                // Has with foils, in some cases, Scryfall's set will contain more cards than specified in the Forge edition,
+                // This will lead to variation indexing (eg. Forest1, Forest2, etc.), the card image will appear missing ingame due to wrong filename
+                // At this moment this issue is more relevant on older sets and should be considered on a per-set basis.
+                if (ignoreNonEnglish && card.Language != "en") continue;
+                if (ignoreVariation && card.Variation) continue;
+
+                bool isImplemented = false;
+                foreach (var set in forgeEditions)
+                {
+                    isImplemented = set.Cards.Any(c => ParsingHelper.ParseCardname(card.Name).Contains(ParsingHelper.ParseCardname(c.Name)));
+                    if (isImplemented) break;
+                }
+
+                // Melded card tokens (eg. from EMN) aren't loaded from the edition as a card but are used in-game from the same path
+                if (isImplemented || (!isImplemented && card.Layout == "meld")) data.ImplementedCards.Add(card);
                 else data.MissingCards.Add(card);
             }
         }

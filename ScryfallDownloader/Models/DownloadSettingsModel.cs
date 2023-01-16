@@ -25,5 +25,10 @@ namespace ScryfallDownloader.Models
         public bool RedownloadData { get; set; } = false;
         public bool PngHighresOnly { get; set; } = true;
         public bool InstantDownload { get; set; } = true;
+        public bool HideUnimplemented { get; set; } = false;
+        public bool IgnoreFoil { get; set; } = false;
+        public bool IgnoreVariations { get; set; } = false;
+        public bool IgnoreNonEnglish { get; set; } = false;
+        public bool DownloadMissing { get; set; } = false;
     }
 }
