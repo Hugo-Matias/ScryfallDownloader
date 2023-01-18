@@ -3,6 +3,8 @@
 @inject IOService IO
 @inject ImageService Image
 @inject ForgeService Forge
+@inject StarCityGamesScraper SCG
+@inject MoxfieldDownloaderService Moxfield
 
 <CascadingValue Value="@this">
     <CascadingValue Value="@state">
@@ -18,6 +20,8 @@
     public ForgeDataModel ForgeData { get; set; } = new();
     public List<Set> AllSets { get; set; } = new();
     public string SetFilter { get; set; } = "";
+
+    private List<SCGDeckModel> _scgDecks = new();
 
     private Dictionary<string, List<string>> _duplicatePrints = new();
     private string _currentSet;
@@ -238,5 +242,40 @@
         }
 
         return ParsingHelper.ParseCardname(cardName, true);
+    }
+
+    public async Task GetScgDecks()
+    {
+        var startingUrl = "https://old.starcitygames.com/decks/results/format/1/start_date/30-10-1970/end_date/22-01-2023/w_perc/0/g_perc/0/r_perc/0/b_perc/0/u_perc/0/a_perc/0/order_1/date desc/order_2/finish/limit/100/start_num/0/";
+
+        var nextUrl = await SCG.GetDecks(_scgDecks, startingUrl);
+        var currentPage = 1;
+
+        do
+        {
+            Console.WriteLine($"Page {currentPage}: Decks {_scgDecks.Count}");
+            currentPage++;
+            nextUrl = await SCG.GetDecks(_scgDecks, nextUrl);
+            //} while (currentPage < 3);
+        } while (!string.IsNullOrWhiteSpace(nextUrl));
+
+        var json = JsonSerializer.Serialize<List<SCGDeckModel>>(_scgDecks, new JsonSerializerOptions() { WriteIndented = true });
+        await IO.SaveTextFile("scgDecks.json", json);
+    }
+
+    public async Task GetMoxfieldDecks()
+    {
+        //List<string> formats = new() { "alchemy", "archon", "brawl", "centurion", "commander", "conquest", "duelCommander", "explorer", "gladiator", "highlanderAustralian", "highlanderCanadian", "highlanderEuropean", "historic", "historicBrawl", "legacy", "leviathan", "modern", "oldSchool", "oathbreaker", "pauper", "pauperEdh", "pennyDreadful", "pioneer", "premodern", "primordial", "standard", "tinyLeaders", "vintage", "none" };
+        List<string> formats = new() { "standard", "none" };
+
+        List<string> formatsPrecons = new() { "precons", "commanderPrecons" };
+
+        foreach (var format in formats)
+        {
+            Console.WriteLine($"\n\n::: {format.ToUpper()} :::\n\n");
+            var decks = await Moxfield.GetDecks(format, "views", true);
+            var json = JsonSerializer.Serialize<List<MoxfieldDeckModel>>(decks, new JsonSerializerOptions() { WriteIndented = true });
+            await IO.SaveTextFile($"moxfield_{format}.json", json);
+        }
     }
 }

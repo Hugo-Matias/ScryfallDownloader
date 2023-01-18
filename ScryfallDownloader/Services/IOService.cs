@@ -7,6 +7,8 @@ namespace ScryfallDownloader.Services
     {
         public Task<string[]> ReadTextFile(string filePath) => File.ReadAllLinesAsync(filePath);
 
+        public Task SaveTextFile(string filePath, string data) => File.WriteAllTextAsync(filePath, data);
+
         public Task SaveFile(string filePath, byte[] data) => File.WriteAllBytesAsync(filePath, data);
 
         public DirectoryInfo CreateDirectory(string path) => Directory.CreateDirectory(path);

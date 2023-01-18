@@ -1,5 +1,6 @@
 ﻿@page "/"
 @using System.Text.RegularExpressions;
+@inject StarCityGamesScraper SCG
 
 <PageTitle>Deck Builder</PageTitle>
 
@@ -28,6 +29,7 @@
 <input type="date" class="form-control" id="before-date" @bind-value="_beforeReleaseDate" />
 
 <button @onclick="ImportDeck">TEST</button>
+<button @onclick="async () => await App.GetMoxfieldDecks()">Get Decks</button>
 
 @code {
     [CascadingParameter]

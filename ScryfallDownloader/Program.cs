@@ -13,6 +13,8 @@ builder.Services.AddHttpClient<ScryfallApiClient>(client =>
 });
 builder.Services.AddHttpClient<CardDownloaderService>();
 builder.Services.AddHttpClient<DataDownloaderService>();
+builder.Services.AddHttpClient<StarCityGamesScraper>();
+builder.Services.AddHttpClient<MoxfieldDownloaderService>();
 builder.Services.AddSingleton<IOService>();
 builder.Services.AddSingleton<ImageService>();
 builder.Services.AddSingleton<ForgeService>();
