@@ -13,7 +13,8 @@ namespace ScryfallDownloader.Services
         private readonly DataDownloaderService _dataDownloader;
         private string _imagesPath;
         private string _editionsPath;
-        private List<Card> _cards;
+
+        public List<Card> Cards { get; set; }
 
         public ForgeService(IOService ioService, ScryfallApiClient api, DataDownloaderService dataDownloader)
         {
@@ -82,13 +83,32 @@ namespace ScryfallDownloader.Services
                     var field = groups[0];
                     var value = groups[1];
 
-                    if (field.ToLower() == "code") model.Code = value;
-                    if (field.ToLower() == "scryfallcode") model.ScryfallCode = value;
-                    if (field.ToLower() == "name") model.Name = value;
-                    if (field.ToLower() == "type") model.Type = value;
-                    if (field.ToLower() == "date") model.Date = DateOnly.Parse(value);
-                    if (field.ToLower() == "code2") model.Code2 = value;
-                    if (field.ToLower() == "alias") model.Alias = value;
+                    switch (field.ToLower())
+                    {
+                        case "code":
+                            model.Code = value;
+                            break;
+                        case "scryfallcode":
+                            model.ScryfallCode = value;
+                            break;
+                        case "name":
+                            model.Name = value;
+                            break;
+                        case "type":
+                            model.Type = value;
+                            break;
+                        case "date":
+                            model.Date = DateOnly.Parse(value);
+                            break;
+                        case "code2":
+                            model.Code2 = value;
+                            break;
+                        case "alias":
+                            model.Alias = value;
+                            break;
+                        default:
+                            break;
+                    }
                 }
 
                 else if (currentSection == "[cards]")
@@ -256,7 +276,7 @@ namespace ScryfallDownloader.Services
 
             var forgeEditions = data.Editions.Where(s => (s.Code2 != null && matchedSets.Count(m => m.ForgeCode == s.Code2.ToLower()) > 0) || matchedSets.Count(m => m.ForgeCode == s.Code.ToLower()) > 0);
 
-            var matchedCards = _cards.Where(c => c.Set == code).ToList();
+            var matchedCards = Cards.Where(c => c.Set == code).ToList();
             var foils = new List<Card>();
             var specialCN = "dps★";
 
@@ -290,16 +310,16 @@ namespace ScryfallDownloader.Services
 
         public async Task GetCardsData(bool redownload = false)
         {
-            if (_cards != null && _cards.Count > 0 && !redownload) return;
+            if (Cards != null && Cards.Count > 0 && !redownload) return;
 
-            _cards = _ioService.GetCardsData();
+            Cards = _ioService.GetCardsData();
 
-            if (_cards == null || redownload)
+            if (Cards == null || redownload)
             {
                 var bulkData = await _api.BulkData.Get();
                 var defaultCards = bulkData.Data.First(x => x.Type == "default_cards");
                 await _dataDownloader.DownloadJsonData(defaultCards.DownloadUri.LocalPath);
-                _cards = _ioService.GetCardsData();
+                Cards = _ioService.GetCardsData();
             }
         }
 

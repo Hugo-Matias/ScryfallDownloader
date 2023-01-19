@@ -61,7 +61,14 @@ namespace ScryfallDownloader.Models
         {
             using (var jsonDoc = JsonDocument.ParseValue(ref reader))
             {
-                return jsonDoc.RootElement.GetProperty("userName").ToString();
+                try
+                {
+                    return jsonDoc.RootElement.GetProperty("userName").ToString();
+                }
+                catch (Exception ex)
+                {
+                    return jsonDoc.RootElement.ToString();
+                }
             }
         }
 

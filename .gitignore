@@ -5,6 +5,9 @@
 
 cards.json
 Decks
+*.db
+*.db-shm
+*.db-wal
 
 # User-specific files
 *.rsuser

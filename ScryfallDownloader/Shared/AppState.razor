@@ -5,6 +5,7 @@
 @inject ForgeService Forge
 @inject StarCityGamesScraper SCG
 @inject MoxfieldDownloaderService Moxfield
+@inject DataService DB
 
 <CascadingValue Value="@this">
     <CascadingValue Value="@state">
@@ -18,7 +19,7 @@
 
     public DownloadSettingsModel DownloadSettings { get; set; } = new();
     public ForgeDataModel ForgeData { get; set; } = new();
-    public List<Set> AllSets { get; set; } = new();
+    public List<ScryfallApi.Client.Models.Set> AllSets { get; set; } = new();
     public string SetFilter { get; set; } = "";
 
     private List<SCGDeckModel> _scgDecks = new();
@@ -41,57 +42,7 @@
     private async Task GetAllSets()
     {
         var result = await Api.Sets.Get();
-        AllSets = new List<Set>(result.Data);
-    }
-
-    public async Task GetCards()
-    {
-        if (DownloadSettings.Sets.Count == 0) return;
-
-        DownloadSettings.Cards.Clear();
-
-        foreach (var set in DownloadSettings.Sets)
-        {
-            try
-            {
-                int page = 1;
-                bool hasMore = false;
-                do
-                {
-                    hasMore = await SearchCardsAndAppend(set, page);
-                    page++;
-                } while (hasMore == true);
-            }
-            catch (Exception e)
-            {
-                throw e;
-            }
-        }
-
-        state.CurrentCard = 0;
-        state.TotalCards = DownloadSettings.Cards.Count();
-    }
-
-    private async Task<bool> SearchCardsAndAppend(string set, int page)
-    {
-        try
-        {
-            SearchOptions options = new SearchOptions()
-                {
-                    Sort = SearchOptions.CardSort.Set,
-                    Mode = SearchOptions.RollupMode.Prints
-                };
-
-            var cards = await Api.Cards.Search($"set:{set}", page, options);
-
-            DownloadSettings.Cards.AddRange(cards.Data);
-
-            return cards.HasMore;
-        }
-        catch (Exception e)
-        {
-            throw e;
-        }
+        AllSets = new List<ScryfallApi.Client.Models.Set>(result.Data);
     }
 
     public async Task AuditSets()
@@ -222,7 +173,7 @@
 
     private string ParseFormat() => (DownloadSettings.Format != "png" || DownloadSettings.ConvertToJpg) ? "jpg" : "png";
 
-    private string ParseCardName(Card card, CardFace? face = null)
+    private string ParseCardName(ScryfallApi.Client.Models.Card card, CardFace? face = null)
     {
         var cardName = face == null ? card.Name : face.Name;
 
@@ -265,8 +216,8 @@
 
     public async Task GetMoxfieldDecks()
     {
-        //List<string> formats = new() { "alchemy", "archon", "brawl", "centurion", "commander", "conquest", "duelCommander", "explorer", "gladiator", "highlanderAustralian", "highlanderCanadian", "highlanderEuropean", "historic", "historicBrawl", "legacy", "leviathan", "modern", "oldSchool", "oathbreaker", "pauper", "pauperEdh", "pennyDreadful", "pioneer", "premodern", "primordial", "standard", "tinyLeaders", "vintage", "none" };
-        List<string> formats = new() { "standard", "none" };
+        //List<string> formats = new() { "alchemy", "archon", "brawl", "centurion", "conquest", "duelCommander", "explorer", "gladiator", "highlanderAustralian", "highlanderCanadian", "highlanderEuropean", "historic", "historicBrawl", "legacy", "leviathan", "oldSchool", "oathbreaker", "pauper", "pauperEdh", "pennyDreadful", "pioneer", "premodern", "primordial", "tinyLeaders", "vintage", "standard", "modern", "commander", "none" };
+        List<string> formats = new() { "none" };
 
         List<string> formatsPrecons = new() { "precons", "commanderPrecons" };
 
@@ -277,5 +228,185 @@
             var json = JsonSerializer.Serialize<List<MoxfieldDeckModel>>(decks, new JsonSerializerOptions() { WriteIndented = true });
             await IO.SaveTextFile($"moxfield_{format}.json", json);
         }
+    }
+
+    public async Task GetCards()
+    {
+        if (DownloadSettings.Sets.Count == 0) return;
+
+        DownloadSettings.Cards.Clear();
+
+        foreach (var set in DownloadSettings.Sets)
+        {
+            try
+            {
+                int page = 1;
+                bool hasMore = false;
+                do
+                {
+                    hasMore = await SearchCardsAndAppend(set, page);
+                    page++;
+                } while (hasMore == true);
+            }
+            catch (Exception e)
+            {
+                throw e;
+            }
+        }
+
+        state.CurrentCard = 0;
+        state.TotalCards = DownloadSettings.Cards.Count();
+    }
+
+    private async Task<bool> SearchCardsAndAppend(string set, int page)
+    {
+        try
+        {
+            SearchOptions options = new SearchOptions()
+                {
+                    Sort = SearchOptions.CardSort.Set,
+                    Mode = SearchOptions.RollupMode.Prints
+                };
+
+            var cards = await Api.Cards.Search($"set:{set}", page, options);
+
+            DownloadSettings.Cards.AddRange(cards.Data);
+
+            return cards.HasMore;
+        }
+        catch (Exception e)
+        {
+            throw e;
+        }
+    }
+
+    public void InitializeDatabase()
+    {
+        var setIndex = 0;
+        foreach (var set in AllSets.OrderBy(s => s.ReleaseDate).ToList().GetRange(0, 1))
+        {
+            setIndex++;
+            Console.WriteLine($"\n\nCreating Set {setIndex}/{AllSets.Count}: {set.Code.ToUpper()} | {set.Name}\n");
+
+            if (DB.GetSet(set.Code) != null) continue;
+
+            var setEntity = new Data.Set();
+
+            setEntity.Name = set.Name;
+            setEntity.Code = set.Code;
+
+            var forgeSet = ForgeData.MatchedSets.FirstOrDefault(s => s.ScryfallCode == set.Code, null);
+            if (forgeSet != null) setEntity.ForgeCode = forgeSet.ForgeCode;
+
+            if (set.ReleaseDate != null) setEntity.ReleaseDate = DateOnly.FromDateTime((DateTime)set.ReleaseDate);
+
+            var setType = DB.GetSetType(set.SetType);
+            if (setType == null) setEntity.SetType = new Data.SetType() { Name = set.SetType };
+            else setEntity.SetType = setType;
+
+            var createdSetEntity = DB.Create(setEntity);
+
+            if (Forge.Cards.Count > 0)
+            {
+                var setCards = Forge.Cards.Where(c => c.Set == set.Code);
+                var cardTotal = setCards.Count();
+                var cardIndex = 0;
+                foreach (var card in setCards)
+                {
+                    cardIndex++;
+                    Console.WriteLine($"{setIndex}||{cardIndex}/{cardTotal}: {card.Name}");
+
+                    var cardEntity = new Data.Card();
+
+                    cardEntity.Name = card.Name;
+                    cardEntity.CollectorsNumber = card.CollectorNumber;
+
+                    if (!string.IsNullOrWhiteSpace(card.Rarity))
+                        cardEntity.Rarity = new Rarity() { Name = card.Rarity, Symbol = card.Rarity.ToUpper()[0] };
+
+                    cardEntity.Artist = new Artist() { Name = card.Artist };
+                    cardEntity.Set = createdSetEntity;
+                    cardEntity.IsImplemented = CheckForgeImplementation(card);
+
+                    var createdCardEntity = DB.Create(cardEntity);
+                    DB.AddCardToSet(createdSetEntity.SetId, createdCardEntity.CardId);
+                }
+            }
+        }
+    }
+
+    public void InitializeDatabaseDecks(string jsonPath)
+    {
+        var decks = IO.GetMoxfieldDecks(jsonPath);
+        var deckIndex = 0;
+        foreach (var deck in decks)
+        {
+            deckIndex++;
+            Console.WriteLine($"\n\nCreating Deck {deckIndex}/{decks.Count}: {deck.Name}\n");
+
+            var deckEntity = new Data.Deck();
+            deckEntity.Name = deck.Name;
+            deckEntity.Description = $"PublicID: {deck.PublicId}";
+            deckEntity.CreateDate = deck.CreatedAt;
+            deckEntity.UpdateDate = deck.UpdatedAt;
+            deckEntity.ViewCount = deck.Views;
+            deckEntity.LikeCount = deck.Likes;
+            deckEntity.CommentCount = deck.Comments;
+            deckEntity.Author = new Data.Author() { Name = deck.Author };
+            deckEntity.Format = new Data.Format() { Name = deck.Format };
+            deckEntity.Source = new Data.Source() { Name = "Moxfield", Url = new Uri("https://www.moxfield.com/") };
+
+            var tagList = new List<Data.Tag>();
+            foreach (var hub in deck.Hubs)
+            {
+                var tag = new Data.Tag() { Name = hub.Name, Description = hub.Description };
+                tagList.Add(tag);
+            }
+            deckEntity.Tags = tagList;
+
+            if (deck.Commanders != null)
+            {
+                var card = DB.GetCard(deck.Commanders[0].Name);
+                deckEntity.Commander = card;
+            }
+
+            var createdDeckEntity = DB.Create(deckEntity);
+
+            var cardIndex = 0;
+            Console.WriteLine("\nMainboard:");
+            
+            foreach (var card in deck.Mainboard)
+            {
+                cardIndex++;
+                Console.WriteLine($"{deckIndex}||{cardIndex}/{deck.Mainboard.Count}: {card.Name}");
+
+                var cardEntity = DB.GetCard(card.Name, card.Set);
+
+                if (cardEntity != null)
+                    DB.AddCardToDeck(createdDeckEntity.DeckId, cardEntity.CardId, card.Quantity, false);
+            }
+
+            if (deck.Sideboard != null)
+            {
+                cardIndex = 0;
+                Console.WriteLine("\nSideboard:");
+
+                foreach (var card in deck.Sideboard)
+                {
+                    cardIndex++;
+                    Console.WriteLine($"{deckIndex}||{cardIndex}/{deck.Mainboard.Count}: {card.Name}");
+
+                    var cardEntity = DB.GetCard(card.Name, card.Set);
+
+                    if (cardEntity != null)
+                        DB.AddCardToDeck(createdDeckEntity.DeckId, cardEntity.CardId, card.Quantity, true);
+                }
+            }
+        }
+    }
+
+    private bool CheckForgeImplementation(ScryfallApi.Client.Models.Card card)
+    {
+        return ForgeData.Editions.Any(e => e.Cards.Any(c => c.Name.Contains(ParsingHelper.ParseCardname(card.Name))));
     }
 }

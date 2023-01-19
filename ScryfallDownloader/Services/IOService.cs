@@ -1,4 +1,5 @@
 ﻿using ScryfallApi.Client.Models;
+using ScryfallDownloader.Models;
 using System.Text.Json;
 
 namespace ScryfallDownloader.Services
@@ -21,6 +22,12 @@ namespace ScryfallDownloader.Services
         {
             if (!File.Exists("cards.json")) return null;
             return JsonSerializer.Deserialize<List<Card>>(File.ReadAllText("cards.json"));
+        }
+
+        public List<MoxfieldDeckModel>? GetMoxfieldDecks(string path)
+        {
+            if (!File.Exists(path)) return null;
+            return JsonSerializer.Deserialize<List<MoxfieldDeckModel>>(File.ReadAllText(path));
         }
     }
 }

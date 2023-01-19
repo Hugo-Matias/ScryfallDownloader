@@ -1,6 +1,7 @@
 ﻿@page "/"
 @using System.Text.RegularExpressions;
 @inject StarCityGamesScraper SCG
+@inject DataService DB
 
 <PageTitle>Deck Builder</PageTitle>
 
@@ -30,6 +31,9 @@
 
 <button @onclick="ImportDeck">TEST</button>
 <button @onclick="async () => await App.GetMoxfieldDecks()">Get Decks</button>
+<button @onclick="InitializeDatabase">Initialize DB</button>
+<button @onclick="@(() => App.InitializeDatabaseDecks("Decks/test.json"))">DB Decks</button>
+<button @onclick="TEST">TestDB</button>
 
 @code {
     [CascadingParameter]
@@ -41,6 +45,18 @@
     private List<ForgeEditionModel> _allowedSets = new();
 
     private Regex _patternMoxfield = new Regex(@"(.+?) (.+?) (\(.+?\)) (.+?$)");
+
+    private void TEST()
+    {
+        //var set = DB.GetSet("lea", true);
+        var deck = DB.GetDeck("DECK 2");
+    }
+
+    private void InitializeDatabase()
+    {
+        DB.RecreateDatabase();
+        App.InitializeDatabase();
+    }
 
     private void ImportDeck()
     {

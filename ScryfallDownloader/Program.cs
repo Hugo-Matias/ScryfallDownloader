@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using ScryfallApi.Client;
 using ScryfallDownloader.Services;
 
@@ -18,6 +19,12 @@ builder.Services.AddHttpClient<MoxfieldDownloaderService>();
 builder.Services.AddSingleton<IOService>();
 builder.Services.AddSingleton<ImageService>();
 builder.Services.AddSingleton<ForgeService>();
+builder.Services.AddSingleton<DataService>();
+
+builder.Services.AddDbContextFactory<DownloaderContext>(options =>
+{
+    options.UseSqlite("Data Source=database.db");
+});
 
 var app = builder.Build();
 
