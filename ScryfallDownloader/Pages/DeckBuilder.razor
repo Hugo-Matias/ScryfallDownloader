@@ -48,16 +48,16 @@
 
     private Regex _patternMoxfield = new Regex(@"(.+?) (.+?) (\(.+?\)) (.+?$)");
 
-    private void TEST()
+    private async Task TEST()
     {
         //var set = DB.GetSet("lea", true);
-        var deck = DB.GetDeck("DECK 2");
+        var deck = await DB.GetDeck("DECK 2");
     }
 
-    private void InitializeDatabase()
+    private async Task InitializeDatabase()
     {
-        DB.RecreateDatabase();
-        App.InitializeDatabase();
+        await DB.RecreateDatabase();
+        await App.InitializeDatabase();
     }
 
     private void ImportDeck()

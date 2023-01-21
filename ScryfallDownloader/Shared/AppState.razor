@@ -196,7 +196,7 @@
         return cardName.ParseCardname(true);
     }
 
-    public void InitializeDatabase()
+    public async Task InitializeDatabase()
     {
         var setIndex = 0;
         foreach (var set in AllSets.OrderBy(s => s.ReleaseDate).ToList())
@@ -204,7 +204,7 @@
             setIndex++;
             Console.WriteLine($"\n\nCreating Set {setIndex}/{AllSets.Count}: {set.Code.ToUpper()} | {set.Name}\n");
 
-            if (DB.GetSet(set.Code) != null) continue;
+            if (await DB.GetSet(set.Code) != null) continue;
 
             var setEntity = new Data.Set();
 
@@ -216,11 +216,11 @@
 
             if (set.ReleaseDate != null) setEntity.ReleaseDate = DateOnly.FromDateTime((DateTime)set.ReleaseDate);
 
-            var setType = DB.GetSetType(set.SetType);
+            var setType = await DB.GetSetType(set.SetType);
             if (setType == null) setEntity.SetType = new Data.SetType() { Name = set.SetType };
             else setEntity.SetType = setType;
 
-            var createdSetEntity = DB.Create(setEntity);
+            var createdSetEntity = await DB.Create(setEntity);
 
             if (Forge.Cards.Count > 0)
             {
@@ -244,8 +244,8 @@
                     cardEntity.Set = createdSetEntity;
                     cardEntity.IsImplemented = CheckForgeImplementation(card.Name);
 
-                    var createdCardEntity = DB.Create(cardEntity);
-                    DB.AddCardToSet(createdSetEntity.SetId, createdCardEntity.CardId);
+                    var createdCardEntity = await DB.Create(cardEntity);
+                    await DB.AddCardToSet(createdSetEntity.SetId, createdCardEntity.CardId);
                 }
             }
         }
@@ -262,7 +262,7 @@
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine($"=========================================================Page: {currentPage}");
             Console.ResetColor();
-            CreateDeckRecords(decks, "MTGTop8", "https://mtgtop8.com/");
+            await CreateDeckRecords(decks, "MTGTop8", "https://mtgtop8.com/");
 
             currentPage++;
         } while (true);
@@ -287,7 +287,7 @@
             Console.WriteLine($"\n\nPage {currentPage}: Decks {_scgDecks.Count}");
             currentPage++;
 
-            CreateDeckRecords(decks, "StarCityGames", "https://old.starcitygames.com/decks/");
+            await CreateDeckRecords(decks, "StarCityGames", "https://old.starcitygames.com/decks/");
             //} while (currentPage < 2);
         } while (!string.IsNullOrWhiteSpace(nextUrl));
 
@@ -297,13 +297,13 @@
         //await IO.SaveTextFile("scgDecks.json", json);
     }
 
-    public void CreateDeckRecords(List<SCGDeckModel> decks, string sourceName, string sourceLink)
+    public async Task CreateDeckRecords(List<SCGDeckModel> decks, string sourceName, string sourceLink)
     {
         var deckIndex = 0;
         foreach (var deck in decks)
         {
             deckIndex++;
-            if (DB.CheckDeckExists(deck.Name, deck.Player, deck.Date)) continue;
+            if (await DB.CheckDeckExists(deck.Name, deck.Player, deck.Date)) continue;
 
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine($"{deckIndex}/{decks.Count}||{deck.Name} - {deck.Player} - {deck.Link.PathAndQuery}");
@@ -318,22 +318,22 @@
             deckEntity.Format = new Data.Format() { Name = deck.Format.ToLower() };
             deckEntity.Source = new Data.Source() { Name = sourceName, Url = new Uri(sourceLink) };
 
-            var createdDeckEntity = DB.Create(deckEntity);
+            var createdDeckEntity = await DB.Create(deckEntity);
 
             var cardIndex = 0;
             foreach (var card in deck.Cards)
             {
                 cardIndex++;
-                if(card.IsSideboard)
+                if (card.IsSideboard)
                     Console.ForegroundColor = ConsoleColor.DarkCyan;
                 Console.WriteLine($"{deckIndex}||{cardIndex}/{deck.Cards.Count}: {card.Name}");
                 Console.ResetColor();
 
                 // Try getting the latest print before deck creation date, get the latest version of the card otherwise.
-                var cardEntity = DB.GetCard(card.Name, DateOnly.FromDateTime(deck.Date));
-                if (cardEntity == null) cardEntity = DB.GetCard(card.Name);
+                var cardEntity = await DB.GetCard(card.Name, DateOnly.FromDateTime(deck.Date));
+                if (cardEntity == null) cardEntity = await DB.GetCard(card.Name);
 
-                if (cardEntity != null) DB.AddCardToDeck(createdDeckEntity.DeckId, cardEntity.CardId, card.Quantity, card.IsSideboard);
+                if (cardEntity != null) await DB.AddCardToDeck(createdDeckEntity.DeckId, cardEntity.CardId, card.Quantity, card.IsSideboard);
                 else
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
@@ -343,7 +343,7 @@
                     else deckEntity.MissingCards.Add(card.Name);
                 }
             }
-            if (deckEntity.MissingCards != null) { var updatedDeck = DB.UpdateDeckMissingCards(deckEntity.DeckId, deckEntity.MissingCards); }
+            if (deckEntity.MissingCards != null) { var updatedDeck = await DB.UpdateDeckMissingCards(deckEntity.DeckId, deckEntity.MissingCards); }
         }
     }
 
@@ -456,9 +456,9 @@
         return isImplemented;
     }
 
-    public void RecheckCardImplementation()
+    public async Task RecheckCardImplementation()
     {
-        var cards = DB.GetUnimplementedCards();
+        var cards = await DB.GetUnimplementedCards();
 
         foreach (var card in cards)
         {
@@ -467,7 +467,7 @@
             if (implementation != card.IsImplemented)
             {
                 Console.WriteLine($"{card.Name}");
-                DB.UpdateCardImplementation(card.CardId, implementation);
+                await DB.UpdateCardImplementation(card.CardId, implementation);
             }
         }
     }
