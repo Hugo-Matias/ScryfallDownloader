@@ -3,9 +3,10 @@
 @inject IOService IO
 @inject ImageService Image
 @inject ForgeService Forge
+@inject DataService DB
 @inject StarCityGamesScraper SCG
 @inject MoxfieldDownloaderService Moxfield
-@inject DataService DB
+@inject MtgTop8DownloaderService MT8
 
 <CascadingValue Value="@this">
     <CascadingValue Value="@state">
@@ -192,98 +193,13 @@
             cardName = cardName + count;
         }
 
-        return ParsingHelper.ParseCardname(cardName, true);
-    }
-
-    public async Task GetScgDecks()
-    {
-        var startingUrl = "https://old.starcitygames.com/decks/results/format/1/start_date/30-10-1970/end_date/22-01-2023/w_perc/0/g_perc/0/r_perc/0/b_perc/0/u_perc/0/a_perc/0/order_1/date desc/order_2/finish/limit/100/start_num/0/";
-
-        var nextUrl = await SCG.GetDecks(_scgDecks, startingUrl);
-        var currentPage = 1;
-
-        do
-        {
-            Console.WriteLine($"Page {currentPage}: Decks {_scgDecks.Count}");
-            currentPage++;
-            nextUrl = await SCG.GetDecks(_scgDecks, nextUrl);
-            //} while (currentPage < 3);
-        } while (!string.IsNullOrWhiteSpace(nextUrl));
-
-        var json = JsonSerializer.Serialize<List<SCGDeckModel>>(_scgDecks, new JsonSerializerOptions() { WriteIndented = true });
-        await IO.SaveTextFile("scgDecks.json", json);
-    }
-
-    public async Task GetMoxfieldDecks()
-    {
-        //List<string> formats = new() { "alchemy", "archon", "brawl", "centurion", "conquest", "duelCommander", "explorer", "gladiator", "highlanderAustralian", "highlanderCanadian", "highlanderEuropean", "historic", "historicBrawl", "legacy", "leviathan", "oldSchool", "oathbreaker", "pauper", "pauperEdh", "pennyDreadful", "pioneer", "premodern", "primordial", "tinyLeaders", "vintage", "standard", "modern", "commander", "none" };
-        List<string> formats = new() { "none" };
-
-        List<string> formatsPrecons = new() { "precons", "commanderPrecons" };
-
-        foreach (var format in formats)
-        {
-            Console.WriteLine($"\n\n::: {format.ToUpper()} :::\n\n");
-            var decks = await Moxfield.GetDecks(format, "views", true);
-            var json = JsonSerializer.Serialize<List<MoxfieldDeckModel>>(decks, new JsonSerializerOptions() { WriteIndented = true });
-            await IO.SaveTextFile($"moxfield_{format}.json", json);
-        }
-    }
-
-    public async Task GetCards()
-    {
-        if (DownloadSettings.Sets.Count == 0) return;
-
-        DownloadSettings.Cards.Clear();
-
-        foreach (var set in DownloadSettings.Sets)
-        {
-            try
-            {
-                int page = 1;
-                bool hasMore = false;
-                do
-                {
-                    hasMore = await SearchCardsAndAppend(set, page);
-                    page++;
-                } while (hasMore == true);
-            }
-            catch (Exception e)
-            {
-                throw e;
-            }
-        }
-
-        state.CurrentCard = 0;
-        state.TotalCards = DownloadSettings.Cards.Count();
-    }
-
-    private async Task<bool> SearchCardsAndAppend(string set, int page)
-    {
-        try
-        {
-            SearchOptions options = new SearchOptions()
-                {
-                    Sort = SearchOptions.CardSort.Set,
-                    Mode = SearchOptions.RollupMode.Prints
-                };
-
-            var cards = await Api.Cards.Search($"set:{set}", page, options);
-
-            DownloadSettings.Cards.AddRange(cards.Data);
-
-            return cards.HasMore;
-        }
-        catch (Exception e)
-        {
-            throw e;
-        }
+        return cardName.ParseCardname(true);
     }
 
     public void InitializeDatabase()
     {
         var setIndex = 0;
-        foreach (var set in AllSets.OrderBy(s => s.ReleaseDate).ToList().GetRange(0, 1))
+        foreach (var set in AllSets.OrderBy(s => s.ReleaseDate).ToList())
         {
             setIndex++;
             Console.WriteLine($"\n\nCreating Set {setIndex}/{AllSets.Count}: {set.Code.ToUpper()} | {set.Name}\n");
@@ -326,7 +242,7 @@
 
                     cardEntity.Artist = new Artist() { Name = card.Artist };
                     cardEntity.Set = createdSetEntity;
-                    cardEntity.IsImplemented = CheckForgeImplementation(card);
+                    cardEntity.IsImplemented = CheckForgeImplementation(card.Name);
 
                     var createdCardEntity = DB.Create(cardEntity);
                     DB.AddCardToSet(createdSetEntity.SetId, createdCardEntity.CardId);
@@ -335,13 +251,126 @@
         }
     }
 
-    public void InitializeDatabaseDecks(string jsonPath)
+    public async Task GetMtgTop8Decks()
+    {
+        var currentPage = 110;
+        do
+        {
+            var decks = await MT8.GetDecks(currentPage);
+            if (decks == null) break;
+
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine($"=========================================================Page: {currentPage}");
+            Console.ResetColor();
+            CreateDeckRecords(decks, "MTGTop8", "https://mtgtop8.com/");
+
+            currentPage++;
+        } while (true);
+
+        Console.WriteLine("Deck Scraping Has Finished!");
+    }
+
+    public async Task GetScgDecks()
+    {
+        var startingUrl = "https://old.starcitygames.com/decks/results/formats_all/All/start_date/01-01-1970/end_date/22-01-2023/order_1/date%20desc/order_2/finish/limit/20/start_num/16300/";
+
+        var currentPage = 816;
+        var nextUrl = string.Empty;
+        do
+        {
+            var response = await SCG.GetDecks(currentPage == 816 ? startingUrl : nextUrl, currentPage);
+            if (response == null) break;
+
+            nextUrl = response.Value.Item1;
+            var decks = response.Value.Item2;
+
+            Console.WriteLine($"\n\nPage {currentPage}: Decks {_scgDecks.Count}");
+            currentPage++;
+
+            CreateDeckRecords(decks, "StarCityGames", "https://old.starcitygames.com/decks/");
+            //} while (currentPage < 2);
+        } while (!string.IsNullOrWhiteSpace(nextUrl));
+
+        Console.WriteLine("Deck Scraping Has Finished!");
+
+        //var json = JsonSerializer.Serialize<List<SCGDeckModel>>(_scgDecks, new JsonSerializerOptions() { WriteIndented = true });
+        //await IO.SaveTextFile("scgDecks.json", json);
+    }
+
+    public void CreateDeckRecords(List<SCGDeckModel> decks, string sourceName, string sourceLink)
+    {
+        var deckIndex = 0;
+        foreach (var deck in decks)
+        {
+            deckIndex++;
+            if (DB.CheckDeckExists(deck.Name, deck.Player, deck.Date)) continue;
+
+            Console.ForegroundColor = ConsoleColor.Green;
+            Console.WriteLine($"{deckIndex}/{decks.Count}||{deck.Name} - {deck.Player} - {deck.Link.PathAndQuery}");
+            Console.ResetColor();
+
+            var deckEntity = new Data.Deck();
+            deckEntity.Name = deck.Name;
+            deckEntity.Description = deck.Description;
+            deckEntity.CreateDate = deck.Date;
+            deckEntity.UpdateDate = DateTime.Now;
+            deckEntity.Author = new Data.Author() { Name = deck.Player };
+            deckEntity.Format = new Data.Format() { Name = deck.Format.ToLower() };
+            deckEntity.Source = new Data.Source() { Name = sourceName, Url = new Uri(sourceLink) };
+
+            var createdDeckEntity = DB.Create(deckEntity);
+
+            var cardIndex = 0;
+            foreach (var card in deck.Cards)
+            {
+                cardIndex++;
+                if(card.IsSideboard)
+                    Console.ForegroundColor = ConsoleColor.DarkCyan;
+                Console.WriteLine($"{deckIndex}||{cardIndex}/{deck.Cards.Count}: {card.Name}");
+                Console.ResetColor();
+
+                // Try getting the latest print before deck creation date, get the latest version of the card otherwise.
+                var cardEntity = DB.GetCard(card.Name, DateOnly.FromDateTime(deck.Date));
+                if (cardEntity == null) cardEntity = DB.GetCard(card.Name);
+
+                if (cardEntity != null) DB.AddCardToDeck(createdDeckEntity.DeckId, cardEntity.CardId, card.Quantity, card.IsSideboard);
+                else
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine($"----CARD NOT FOUND: {card.Name}");
+                    Console.ResetColor();
+                    if (deckEntity.MissingCards == null) deckEntity.MissingCards = new List<string>() { card.Name };
+                    else deckEntity.MissingCards.Add(card.Name);
+                }
+            }
+            if (deckEntity.MissingCards != null) { var updatedDeck = DB.UpdateDeckMissingCards(deckEntity.DeckId, deckEntity.MissingCards); }
+        }
+    }
+
+    public async Task GetMoxfieldDecks()
+    {
+        //List<string> formats = new() { "alchemy", "archon", "brawl", "centurion", "conquest", "duelCommander", "explorer", "gladiator", "highlanderAustralian", "highlanderCanadian", "highlanderEuropean", "historic", "historicBrawl", "legacy", "leviathan", "oldSchool", "oathbreaker", "pauper", "pauperEdh", "pennyDreadful", "pioneer", "premodern", "primordial", "tinyLeaders", "vintage", "standard", "modern", "commander", "none" };
+        List<string> formats = new() { "none" };
+
+        List<string> formatsPrecons = new() { "precons", "commanderPrecons" };
+
+        foreach (var format in formats)
+        {
+            Console.WriteLine($"\n\n::: {format.ToUpper()} :::\n\n");
+            var decks = await Moxfield.GetDecks(format, "views", true);
+            var json = JsonSerializer.Serialize<List<MoxfieldDeckModel>>(decks, new JsonSerializerOptions() { WriteIndented = true });
+            await IO.SaveTextFile($"moxfield_{format}.json", json);
+        }
+    }
+
+    public void CreateMoxfieldDeckRecordsFromJson(string jsonPath)
     {
         var decks = IO.GetMoxfieldDecks(jsonPath);
         var deckIndex = 0;
         foreach (var deck in decks)
         {
             deckIndex++;
+            if (DB.CheckDeckExists(deck.Name, deck.CreatedAt)) continue;
             Console.WriteLine($"\n\nCreating Deck {deckIndex}/{decks.Count}: {deck.Name}\n");
 
             var deckEntity = new Data.Deck();
@@ -353,16 +382,19 @@
             deckEntity.LikeCount = deck.Likes;
             deckEntity.CommentCount = deck.Comments;
             deckEntity.Author = new Data.Author() { Name = deck.Author };
-            deckEntity.Format = new Data.Format() { Name = deck.Format };
+            deckEntity.Format = new Data.Format() { Name = deck.Format.ToLower() };
             deckEntity.Source = new Data.Source() { Name = "Moxfield", Url = new Uri("https://www.moxfield.com/") };
 
-            var tagList = new List<Data.Tag>();
-            foreach (var hub in deck.Hubs)
+            if (deck.Hubs != null)
             {
-                var tag = new Data.Tag() { Name = hub.Name, Description = hub.Description };
-                tagList.Add(tag);
+                var tagList = new List<Data.Tag>();
+                foreach (var hub in deck.Hubs)
+                {
+                    var tag = new Data.Tag() { Name = hub.Name, Description = hub.Description };
+                    tagList.Add(tag);
+                }
+                deckEntity.Tags = tagList;
             }
-            deckEntity.Tags = tagList;
 
             if (deck.Commanders != null)
             {
@@ -374,16 +406,21 @@
 
             var cardIndex = 0;
             Console.WriteLine("\nMainboard:");
-            
-            foreach (var card in deck.Mainboard)
+
+            if (deck.Mainboard != null)
             {
-                cardIndex++;
-                Console.WriteLine($"{deckIndex}||{cardIndex}/{deck.Mainboard.Count}: {card.Name}");
+                foreach (var card in deck.Mainboard)
+                {
+                    cardIndex++;
+                    Console.WriteLine($"{deckIndex}||{cardIndex}/{deck.Mainboard.Count}: {card.Name}");
 
-                var cardEntity = DB.GetCard(card.Name, card.Set);
+                    var cardEntity = DB.GetCard(card.Name, card.Set);
 
-                if (cardEntity != null)
-                    DB.AddCardToDeck(createdDeckEntity.DeckId, cardEntity.CardId, card.Quantity, false);
+                    if (cardEntity != null)
+                        DB.AddCardToDeck(createdDeckEntity.DeckId, cardEntity.CardId, card.Quantity, false);
+                    else
+                        Console.WriteLine($"----CARD NOT FOUND: {card.Name} | {card.Set}");
+                }
             }
 
             if (deck.Sideboard != null)
@@ -394,19 +431,44 @@
                 foreach (var card in deck.Sideboard)
                 {
                     cardIndex++;
-                    Console.WriteLine($"{deckIndex}||{cardIndex}/{deck.Mainboard.Count}: {card.Name}");
+                    Console.WriteLine($"{deckIndex}||{cardIndex}/{deck.Sideboard.Count}: {card.Name}");
 
                     var cardEntity = DB.GetCard(card.Name, card.Set);
 
                     if (cardEntity != null)
                         DB.AddCardToDeck(createdDeckEntity.DeckId, cardEntity.CardId, card.Quantity, true);
+                    else
+                        Console.WriteLine($"----CARD NOT FOUND: {card.Name} | {card.Set}");
                 }
             }
         }
     }
 
-    private bool CheckForgeImplementation(ScryfallApi.Client.Models.Card card)
+    private bool CheckForgeImplementation(string cardName)
     {
-        return ForgeData.Editions.Any(e => e.Cards.Any(c => c.Name.Contains(ParsingHelper.ParseCardname(card.Name))));
+        // Check for flip cards where both parts of the name are relevant but Forge ignores the separator characters (eg. Wear // Tear => WearTear)
+        var isImplemented = ForgeData.Editions.Any(e => e.Cards.Any(c => c.Name.ParseCardname().Contains(cardName.ParseCardname())));
+
+        // Check for double faced cards where only the first part of the name is relevant (eg. Thing in the Ice // Awoken Horror => Thing in the Ice)
+        if (!isImplemented)
+            isImplemented = ForgeData.Editions.Any(e => e.Cards.Any(c => c.Name.ParseSplitCardname().Contains(cardName.ParseSplitCardname())));
+
+        return isImplemented;
+    }
+
+    public void RecheckCardImplementation()
+    {
+        var cards = DB.GetUnimplementedCards();
+
+        foreach (var card in cards)
+        {
+            var implementation = CheckForgeImplementation(card.Name);
+
+            if (implementation != card.IsImplemented)
+            {
+                Console.WriteLine($"{card.Name}");
+                DB.UpdateCardImplementation(card.CardId, implementation);
+            }
+        }
     }
 }

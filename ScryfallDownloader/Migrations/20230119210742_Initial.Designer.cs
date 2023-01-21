@@ -10,8 +10,8 @@ using ScryfallDownloader.Services;
 
 namespace ScryfallDownloader.Migrations
 {
-    [DbContext(typeof(DownloaderContext))]
-    [Migration("20230119184014_Initial")]
+    [DbContext(typeof(DatabaseContext))]
+    [Migration("20230119210742_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -49,6 +49,9 @@ namespace ScryfallDownloader.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("AuthorId");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
 
                     b.ToTable("Authors");
                 });
@@ -156,7 +159,7 @@ namespace ScryfallDownloader.Migrations
                     b.Property<int>("Quantity")
                         .HasColumnType("INTEGER");
 
-                    b.HasKey("DeckId", "CardId");
+                    b.HasKey("DeckId", "CardId", "IsSideboard");
 
                     b.HasIndex("CardId");
 
@@ -174,6 +177,9 @@ namespace ScryfallDownloader.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("FormatId");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
 
                     b.ToTable("Formats");
                 });
@@ -259,6 +265,9 @@ namespace ScryfallDownloader.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("SourceId");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
 
                     b.ToTable("Sources");
                 });

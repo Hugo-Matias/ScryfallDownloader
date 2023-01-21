@@ -30,10 +30,12 @@
 <input type="date" class="form-control" id="before-date" @bind-value="_beforeReleaseDate" />
 
 <button @onclick="ImportDeck">TEST</button>
-<button @onclick="async () => await App.GetMoxfieldDecks()">Get Decks</button>
+<button @onclick="async () => await App.GetMtgTop8Decks()">Get Decks</button>
+@*<button @onclick="async () => await App.GetScgDecks()">Get Decks</button>*@
 <button @onclick="InitializeDatabase">Initialize DB</button>
-<button @onclick="@(() => App.InitializeDatabaseDecks("Decks/test.json"))">DB Decks</button>
+<button @onclick="@(() => App.CreateMoxfieldDeckRecordsFromJson("Decks/Moxfield/moxfield_explorer.json"))">DB Decks</button>
 <button @onclick="TEST">TestDB</button>
+<button @onclick="App.RecheckCardImplementation">RecheckImplementation</button>
 
 @code {
     [CascadingParameter]
@@ -75,7 +77,7 @@
         {
             if (!_patternMoxfield.IsMatch(line)) continue;
             var groups = _patternMoxfield.Matches(line)[0].Groups;
-            quantity = ParsingHelper.ParseToInt(groups[1].Value);
+            quantity = groups[1].Value.ParseToInt();
             name = groups[2].Value;
             set = Regex.Replace(groups[3].Value, @"[\(\)]", "", RegexOptions.Compiled).ToLower();
             collectorsNumber = groups[4].Value;
@@ -107,7 +109,7 @@
 
         foreach (var card in _deckCards)
         {
-            var parsedName = ParsingHelper.ParseCardname(card.Name).ToLower();
+            var parsedName = card.Name.ToLower().ParseCardname();
             var cardSets = App.ForgeData.Editions.Where(s => s.Cards.Any(c => c.Name.ToLower().Contains(parsedName)) && s.Date < _beforeReleaseDate).OrderByDescending(s => s.Date);
 
             if(string.IsNullOrWhiteSpace(card.Set)) card.Set = cardSets.ElementAt(0).Code.ToLower();

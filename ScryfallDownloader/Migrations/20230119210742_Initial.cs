@@ -199,12 +199,12 @@ namespace ScryfallDownloader.Migrations
                 {
                     DeckId = table.Column<int>(type: "INTEGER", nullable: false),
                     CardId = table.Column<int>(type: "INTEGER", nullable: false),
-                    Quantity = table.Column<int>(type: "INTEGER", nullable: false),
-                    IsSideboard = table.Column<bool>(type: "INTEGER", nullable: false)
+                    IsSideboard = table.Column<bool>(type: "INTEGER", nullable: false),
+                    Quantity = table.Column<int>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_DeckCards", x => new { x.DeckId, x.CardId });
+                    table.PrimaryKey("PK_DeckCards", x => new { x.DeckId, x.CardId, x.IsSideboard });
                     table.ForeignKey(
                         name: "FK_DeckCards_Cards_CardId",
                         column: x => x.CardId,
@@ -242,6 +242,12 @@ namespace ScryfallDownloader.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_Artists_Name",
                 table: "Artists",
+                column: "Name",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Authors_Name",
+                table: "Authors",
                 column: "Name",
                 unique: true);
 
@@ -286,6 +292,12 @@ namespace ScryfallDownloader.Migrations
                 column: "SourceId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_Formats_Name",
+                table: "Formats",
+                column: "Name",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Rarities_Name",
                 table: "Rarities",
                 column: "Name",
@@ -295,6 +307,12 @@ namespace ScryfallDownloader.Migrations
                 name: "IX_Sets_SetTypeId",
                 table: "Sets",
                 column: "SetTypeId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Sources_Name",
+                table: "Sources",
+                column: "Name",
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_Tags_DeckId",

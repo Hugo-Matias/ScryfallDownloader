@@ -282,7 +282,7 @@ namespace ScryfallDownloader.Services
 
             // First OrderBy integer converted CN, this will enable natural sorting for all the cards, including the ones with special chars.
             // ThenBy, will make sure identical CN's with special characters will be ordered correctly (eg. 1, 1★).
-            foreach (var card in matchedCards.OrderBy(c => ParsingHelper.ParseToInt(c.CollectorNumber)).ThenBy(c => c.CollectorNumber))
+            foreach (var card in matchedCards.OrderBy(c => c.CollectorNumber.ParseToInt()).ThenBy(c => c.CollectorNumber))
             {
                 // TODO: Better logic to handle foils,
                 // Current implementation works for some particular sets where Scryfall's data doesn't match with Forge editions (eg. 10E)
@@ -298,7 +298,7 @@ namespace ScryfallDownloader.Services
                 bool isImplemented = false;
                 foreach (var set in forgeEditions)
                 {
-                    isImplemented = set.Cards.Any(c => ParsingHelper.ParseCardname(card.Name).Contains(ParsingHelper.ParseCardname(c.Name)));
+                    isImplemented = set.Cards.Any(c => card.Name.ParseCardname().Contains(c.Name.ParseCardname()));
                     if (isImplemented) break;
                 }
 

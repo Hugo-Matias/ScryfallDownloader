@@ -15,11 +15,19 @@ namespace ScryfallDownloader.Services
             //_httpClient.BaseAddress = new Uri("https://old.starcitygames.com");
         }
 
-        public async Task<string> GetDecks(List<SCGDeckModel> decks, string url)
+        /// <summary>
+        /// Fetches data from the specified SCG url and serializes it into SCG models.
+        /// </summary>
+        /// <param name="url"></param>
+        /// <param name="currentPage"></param>
+        /// <returns>Tuple of (string nextPageUrl, List<SCGDeckModel> parsedDeckModels)</returns>
+        public async Task<(string, List<SCGDeckModel>)?> GetDecks(string url, int currentPage)
         {
-            if (string.IsNullOrWhiteSpace(url)) return "";
+            if (string.IsNullOrWhiteSpace(url)) return null;
 
-            var response = await GetPage(url);
+            List<SCGDeckModel> decks = new();
+
+            var response = await _httpClient.GetStringAsync(url);
 
             var doc = new HtmlDocument();
             doc.LoadHtml(response);
@@ -35,29 +43,35 @@ namespace ScryfallDownloader.Services
 
             var deckElements = tableRows.Where(n => n.ChildNodes.Any(c => c.GetAttributeValue("class", "").Contains("deckdbbody")));
 
+            var deckIndex = 0;
+            var decksTotal = deckElements.Count();
             foreach (var node in deckElements)
             {
+                deckIndex++;
                 if (node.ChildNodes.Count() != 8) { continue; }
 
                 var name = node.FirstChild.InnerText;
                 var link = new Uri(node.FirstChild.FirstChild.GetAttributeValue("href", ""));
-                var finish = ParsingHelper.ParseToInt(node.ChildNodes[1].InnerText);
+                var finish = node.ChildNodes[1].InnerText.ParseToInt();
                 var player = node.ChildNodes[3].InnerText;
                 var eventName = node.ChildNodes[4].InnerText;
                 var format = node.ChildNodes[5].InnerText;
-                var date = DateOnly.Parse(node.ChildNodes[6].FirstChild.InnerText);
+                var date = DateTime.Parse(node.ChildNodes[6].FirstChild.InnerText);
                 var location = node.ChildNodes[7].InnerText;
+                var description = $"Code: {link.Segments.LastOrDefault()}\r\nPlace: {finish}\r\nEvent: {eventName}\r\nLocation: {location}";
 
-                Console.WriteLine("|" + link.Segments.LastOrDefault() + "|");
+                //Console.WriteLine("|" + link.Segments.LastOrDefault() + "|");
+                Console.WriteLine($"Page:{currentPage}||Deck:{deckIndex}/{decksTotal}||{name} - {link.Segments.LastOrDefault()}");
 
-                var decklist = await GetDecklist(link.Segments.LastOrDefault());
+                var decklistString = await GetDecklist(link.Segments.LastOrDefault());
 
-                if (string.IsNullOrWhiteSpace(decklist)) { Console.WriteLine($"EMPTY DECKLIST: {name} - {link.AbsolutePath}"); ; }
+                if (string.IsNullOrWhiteSpace(decklistString)) { Console.WriteLine($"EMPTY DECKLIST: {name} - {link.AbsolutePath}"); continue; }
+                var deck = ParseDecklist(decklistString);
 
-                decks.Add(new SCGDeckModel() { Name = name, Link = link, Finish = finish, Player = player, Event = eventName, Format = format, Date = date, Location = location });
+                decks.Add(new SCGDeckModel() { Name = name, Link = link, Description = description, Finish = finish, Player = player, Event = eventName, Format = format, Date = date, Location = location, Cards = deck });
             }
 
-            return nextPageLink;
+            return (nextPageLink, decks);
         }
 
         private async Task<string> GetDecklist(string code)
@@ -69,9 +83,33 @@ namespace ScryfallDownloader.Services
                 return await _httpClient.GetStringAsync(response.Headers.Location.AbsoluteUri);
             }
             else
-                throw new Exception($"NO REDIRECT FOR: {code}");
+            {
+                Console.WriteLine($"NO REDIRECT FOR: {code}");
+                return string.Empty;
+            }
         }
 
-        private async Task<string> GetPage(string url) => await _httpClient.GetStringAsync(url);
+        private List<SCGCardModel> ParseDecklist(string decklist)
+        {
+            List<SCGCardModel> deck = new();
+            var section = "mainboard";
+
+            foreach (var line in decklist.SplitToLines())
+            {
+                var groups = line.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+
+                if (groups.Length < 2)
+                {
+                    section = line;
+                    continue;
+                }
+
+                var quantity = groups[0].ParseToInt();
+                var name = groups[1];
+                deck.Add(new SCGCardModel { Name = name, Quantity = quantity, IsSideboard = section != "mainboard" });
+            }
+
+            return deck;
+        }
     }
 }

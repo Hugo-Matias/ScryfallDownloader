@@ -5,10 +5,10 @@ namespace ScryfallDownloader.Services
 {
     public class DataService
     {
-        private readonly IDbContextFactory<DownloaderContext> _contextFactory;
+        private readonly IDbContextFactory<DatabaseContext> _contextFactory;
         private readonly ForgeService _forge;
 
-        public DataService(IDbContextFactory<DownloaderContext> contextFactory, ForgeService forge)
+        public DataService(IDbContextFactory<DatabaseContext> contextFactory, ForgeService forge)
         {
             _contextFactory = contextFactory;
             _forge = forge;
@@ -81,6 +81,7 @@ namespace ScryfallDownloader.Services
                 return deckEntity;
             }
         }
+
         public Card Create(Card card)
         {
             using (var context = _contextFactory.CreateDbContext())
@@ -127,6 +128,7 @@ namespace ScryfallDownloader.Services
                     return context.Sets.FirstOrDefault(s => s.Code == code);
             }
         }
+
         public SetType GetSetType(string name)
         {
             using (var context = _contextFactory.CreateDbContext())
@@ -134,6 +136,7 @@ namespace ScryfallDownloader.Services
                 return context.SetTypes.Where(s => s.Name == name).FirstOrDefault();
             }
         }
+
         public Card GetCard(string name)
         {
             using (var context = _contextFactory.CreateDbContext())
@@ -141,9 +144,11 @@ namespace ScryfallDownloader.Services
                 return context.Cards.Include(c => c.Rarity)
                                     .Include(c => c.Artist)
                                     .Include(c => c.Set)
-                                    .First(c => c.Name == name);
+                                    .OrderByDescending(c => c.Set.ReleaseDate)
+                                    .FirstOrDefault(c => c.Name.ToLower().Contains(name.ToLower()));
             }
         }
+
         public Card GetCard(string name, string setCode)
         {
             using (var context = _contextFactory.CreateDbContext())
@@ -151,9 +156,22 @@ namespace ScryfallDownloader.Services
                 return context.Cards.Include(c => c.Rarity)
                                     .Include(c => c.Artist)
                                     .Include(c => c.Set)
-                                    .First(c => c.Name == name && c.Set.Code == setCode);
+                                    .FirstOrDefault(c => c.Name.ToLower().Contains(name.ToLower()) && c.Set.Code == setCode);
             }
         }
+
+        public Card GetCard(string name, DateOnly date)
+        {
+            using (var context = _contextFactory.CreateDbContext())
+            {
+                return context.Cards.Include(c => c.Rarity)
+                                    .Include(c => c.Artist)
+                                    .Include(c => c.Set)
+                                    .OrderByDescending(c => c.Set.ReleaseDate)
+                                    .FirstOrDefault(c => c.Name.ToLower().Contains(name.ToLower()) && c.Set.ReleaseDate <= date);
+            }
+        }
+
         public List<Card> GetCards(string name)
         {
             using (var context = _contextFactory.CreateDbContext())
@@ -161,10 +179,33 @@ namespace ScryfallDownloader.Services
                 return context.Cards.Include(c => c.Artist)
                                     .Include(c => c.Rarity)
                                     .Include(c => c.Set)
-                                    .Where(c => c.Name == name)
+                                    .Where(c => c.Name.ToLower().Contains(name.ToLower()))
                                     .ToList();
             }
         }
+
+        public List<Card> GetUnimplementedCards()
+        {
+            using (var context = _contextFactory.CreateDbContext())
+            {
+                return context.Cards.Where(c => c.IsImplemented == false).ToList();
+            }
+        }
+
+        public Card UpdateCardImplementation(int cardId, bool isImplemented)
+        {
+            using (var context = _contextFactory.CreateDbContext())
+            {
+                var card = context.Cards.FirstOrDefault(c => c.CardId == cardId);
+                if (card != null)
+                {
+                    card.IsImplemented = isImplemented;
+                    context.SaveChanges();
+                }
+                return card;
+            }
+        }
+
         public Deck GetDeck(string name)
         {
             using (var context = _contextFactory.CreateDbContext())
@@ -176,7 +217,34 @@ namespace ScryfallDownloader.Services
                                     .Include(d => d.Tags)
                                     .Include(d => d.Commander).ThenInclude(c => c.Artist)
                                     .Include(d => d.Commander).ThenInclude(c => c.Rarity)
-                                    .First(d => d.Name == name);
+                                    .FirstOrDefault(d => d.Name == name);
+            }
+        }
+
+        public bool CheckDeckExists(string name, DateTime createDate)
+        {
+            using (var context = _contextFactory.CreateDbContext())
+            {
+                return context.Decks.Any(d => d.Name == name && d.CreateDate == createDate);
+            }
+        }
+
+        public bool CheckDeckExists(string name, string authorName, DateTime createDate)
+        {
+            using (var context = _contextFactory.CreateDbContext())
+            {
+                return context.Decks.Any(d => d.Name == name && d.CreateDate == createDate && d.Author.Name == authorName);
+            }
+        }
+
+        public Deck UpdateDeckMissingCards(int deckId, ICollection<string> missingCards)
+        {
+            using (var context = _contextFactory.CreateDbContext())
+            {
+                var deck = context.Decks.FirstOrDefault(d => d.DeckId == deckId);
+                deck.MissingCards = missingCards;
+                context.SaveChanges();
+                return deck;
             }
         }
 
@@ -197,6 +265,15 @@ namespace ScryfallDownloader.Services
         {
             using (var context = _contextFactory.CreateDbContext())
             {
+                var deckCardEntity = context.DeckCards.FirstOrDefault(dc => dc.DeckId == deckId && dc.CardId == cardId && dc.IsSideboard == isSideboard);
+
+                if (deckCardEntity != null)
+                {
+                    deckCardEntity.Quantity += quantity;
+                    context.SaveChanges();
+                    return;
+                }
+
                 var deckCard = new DeckCard();
                 var deck = context.Decks.FirstOrDefault(c => c.DeckId == deckId);
                 var card = context.Cards.FirstOrDefault(c => c.CardId == cardId);
@@ -207,6 +284,7 @@ namespace ScryfallDownloader.Services
                 deckCard.IsSideboard = isSideboard;
 
                 context.DeckCards.Add(deckCard);
+
                 context.SaveChanges();
             }
         }
@@ -216,7 +294,7 @@ namespace ScryfallDownloader.Services
             using (var context = _contextFactory.CreateDbContext())
             {
                 context.Database.EnsureDeleted();
-                context.Database.EnsureCreated();
+                context.Database.Migrate();
             }
         }
     }

@@ -16,12 +16,13 @@ builder.Services.AddHttpClient<CardDownloaderService>();
 builder.Services.AddHttpClient<DataDownloaderService>();
 builder.Services.AddHttpClient<StarCityGamesScraper>();
 builder.Services.AddHttpClient<MoxfieldDownloaderService>();
+builder.Services.AddHttpClient<MtgTop8DownloaderService>();
 builder.Services.AddSingleton<IOService>();
 builder.Services.AddSingleton<ImageService>();
 builder.Services.AddSingleton<ForgeService>();
 builder.Services.AddSingleton<DataService>();
 
-builder.Services.AddDbContextFactory<DownloaderContext>(options =>
+builder.Services.AddDbContextFactory<DatabaseContext>(options =>
 {
     options.UseSqlite("Data Source=database.db");
 });

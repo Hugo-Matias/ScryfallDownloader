@@ -16,5 +16,6 @@
         public int? LikeCount { get; set; }
         public int? CommentCount { get; set; }
         public ICollection<DeckCard>? Cards { get; set; }
+        public ICollection<string>? MissingCards { get; set; }
     }
 }
