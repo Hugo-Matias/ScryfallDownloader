@@ -9,6 +9,6 @@
         public Artist? Artist { get; set; }
         public Set Set { get; set; }
         public bool IsImplemented { get; set; }
-        public ICollection<Deck> Decks { get; set; }
+        public ICollection<DeckCard> Decks { get; set; }
     }
 }

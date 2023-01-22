@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ScryfallDownloader.Services;
 
@@ -10,9 +11,11 @@ using ScryfallDownloader.Services;
 namespace ScryfallDownloader.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    partial class DownloaderContextModelSnapshot : ModelSnapshot
+    [Migration("20230122152104_Add Settings")]
+    partial class AddSettings
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "7.0.2");

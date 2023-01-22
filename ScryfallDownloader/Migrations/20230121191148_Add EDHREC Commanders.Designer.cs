@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ScryfallDownloader.Services;
 
@@ -10,9 +11,11 @@ using ScryfallDownloader.Services;
 namespace ScryfallDownloader.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    partial class DownloaderContextModelSnapshot : ModelSnapshot
+    [Migration("20230121191148_Add EDHREC Commanders")]
+    partial class AddEDHRECCommanders
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "7.0.2");
@@ -98,9 +101,6 @@ namespace ScryfallDownloader.Migrations
                     b.Property<int>("AuthorId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int?>("Commander2CardId")
-                        .HasColumnType("INTEGER");
-
                     b.Property<int?>("CommanderCardId")
                         .HasColumnType("INTEGER");
 
@@ -138,8 +138,6 @@ namespace ScryfallDownloader.Migrations
                     b.HasKey("DeckId");
 
                     b.HasIndex("AuthorId");
-
-                    b.HasIndex("Commander2CardId");
 
                     b.HasIndex("CommanderCardId");
 
@@ -189,9 +187,6 @@ namespace ScryfallDownloader.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("EdhrecCommanderId");
-
-                    b.HasIndex("Name")
-                        .IsUnique();
 
                     b.ToTable("EdhrecCommanders");
                 });
@@ -280,40 +275,6 @@ namespace ScryfallDownloader.Migrations
                     b.ToTable("SetTypes");
                 });
 
-            modelBuilder.Entity("ScryfallDownloader.Data.Setting", b =>
-                {
-                    b.Property<int>("SettingId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("EDHCommander")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("EDHDeck")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("MT8Page")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("SCGDate")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("SCGDeck")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("SCGLimit")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("SCGPage")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("SettingId");
-
-                    b.ToTable("Settings");
-                });
-
             modelBuilder.Entity("ScryfallDownloader.Data.Source", b =>
                 {
                     b.Property<int>("SourceId")
@@ -393,12 +354,8 @@ namespace ScryfallDownloader.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("ScryfallDownloader.Data.Card", "Commander2")
-                        .WithMany()
-                        .HasForeignKey("Commander2CardId");
-
                     b.HasOne("ScryfallDownloader.Data.Card", "Commander")
-                        .WithMany()
+                        .WithMany("Decks")
                         .HasForeignKey("CommanderCardId");
 
                     b.HasOne("ScryfallDownloader.Data.Format", "Format")
@@ -417,8 +374,6 @@ namespace ScryfallDownloader.Migrations
 
                     b.Navigation("Commander");
 
-                    b.Navigation("Commander2");
-
                     b.Navigation("Format");
 
                     b.Navigation("Source");
@@ -427,7 +382,7 @@ namespace ScryfallDownloader.Migrations
             modelBuilder.Entity("ScryfallDownloader.Data.DeckCard", b =>
                 {
                     b.HasOne("ScryfallDownloader.Data.Card", "Card")
-                        .WithMany("Decks")
+                        .WithMany()
                         .HasForeignKey("CardId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();

@@ -1,6 +1,6 @@
 ﻿namespace ScryfallDownloader.Models
 {
-    public class SCGDeckModel
+    public class BaseDeckModel
     {
         public string Name { get; set; }
         public Uri Link { get; set; }
@@ -11,6 +11,6 @@
         public string Format { get; set; }
         public DateTime Date { get; set; }
         public string? Location { get; set; }
-        public List<SCGCardModel>? Cards { get; set; }
+        public List<BaseCardModel>? Cards { get; set; }
     }
 }

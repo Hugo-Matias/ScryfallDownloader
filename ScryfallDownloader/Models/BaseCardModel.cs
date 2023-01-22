@@ -1,6 +1,6 @@
 ﻿namespace ScryfallDownloader.Models
 {
-    public class SCGCardModel
+    public class BaseCardModel
     {
         public string Name { get; set; }
         public int Quantity { get; set; }

@@ -5,14 +5,40 @@ using System.Net;
 
 namespace ScryfallDownloader.Services
 {
-    public class StarCityGamesScraper
+    public class StarCityGamesDownloaderService
     {
         private readonly HttpClient _httpClient;
+        private readonly DataService _db;
 
-        public StarCityGamesScraper(HttpClient httpClient)
+        public StarCityGamesDownloaderService(HttpClient httpClient, DataService db)
         {
             _httpClient = httpClient;
+            _db = db;
             //_httpClient.BaseAddress = new Uri("https://old.starcitygames.com");
+        }
+
+        public async Task Download()
+        {
+            var settings = await _db.LoadSettings();
+            do
+            {
+                var url = $"https://old.starcitygames.com/decks/results/formats_all/All/start_date/01-01-1970/end_date/{settings.SCGDate}/order_1/date%20desc/order_2/finish/limit/{settings.SCGLimit}/start_num/{settings.SCGDeck}/";
+
+                var response = await GetDecks(url, settings.SCGPage);
+                if (response == null) break;
+
+                var decks = response.Value.Item2;
+                await _db.CreateDeckEntities(decks, "StarCityGames", "https://old.starcitygames.com/decks/");
+
+                Console.WriteLine($"\n\nPage {settings.SCGPage}: Decks {decks.Count}");
+
+                settings.SCGDeck += settings.SCGLimit;
+                settings.SCGPage++;
+
+                await _db.SaveSettings(settings);
+            } while (true);
+
+            Console.WriteLine("\n\nDeck Scraping Has Finished!");
         }
 
         /// <summary>
@@ -21,11 +47,11 @@ namespace ScryfallDownloader.Services
         /// <param name="url"></param>
         /// <param name="currentPage"></param>
         /// <returns>Tuple of (string nextPageUrl, List<SCGDeckModel> parsedDeckModels)</returns>
-        public async Task<(string, List<SCGDeckModel>)?> GetDecks(string url, int currentPage)
+        public async Task<(string, List<BaseDeckModel>)?> GetDecks(string url, int currentPage)
         {
             if (string.IsNullOrWhiteSpace(url)) return null;
 
-            List<SCGDeckModel> decks = new();
+            List<BaseDeckModel> decks = new();
 
             var response = await _httpClient.GetStringAsync(url);
 
@@ -68,7 +94,7 @@ namespace ScryfallDownloader.Services
                 if (string.IsNullOrWhiteSpace(decklistString)) { Console.WriteLine($"EMPTY DECKLIST: {name} - {link.AbsolutePath}"); continue; }
                 var deck = ParseDecklist(decklistString);
 
-                decks.Add(new SCGDeckModel() { Name = name, Link = link, Description = description, Finish = finish, Player = player, Event = eventName, Format = format, Date = date, Location = location, Cards = deck });
+                decks.Add(new BaseDeckModel() { Name = name, Link = link, Description = description, Finish = finish, Player = player, Event = eventName, Format = format, Date = date, Location = location, Cards = deck });
             }
 
             return (nextPageLink, decks);
@@ -89,9 +115,9 @@ namespace ScryfallDownloader.Services
             }
         }
 
-        private List<SCGCardModel> ParseDecklist(string decklist)
+        private List<BaseCardModel> ParseDecklist(string decklist)
         {
-            List<SCGCardModel> deck = new();
+            List<BaseCardModel> deck = new();
             var section = "mainboard";
 
             foreach (var line in decklist.SplitToLines())
@@ -106,7 +132,7 @@ namespace ScryfallDownloader.Services
 
                 var quantity = groups[0].ParseToInt();
                 var name = groups[1];
-                deck.Add(new SCGCardModel { Name = name, Quantity = quantity, IsSideboard = section != "mainboard" });
+                deck.Add(new BaseCardModel { Name = name, Quantity = quantity, IsSideboard = section != "mainboard" });
             }
 
             return deck;

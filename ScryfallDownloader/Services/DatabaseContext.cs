@@ -21,6 +21,8 @@ namespace ScryfallDownloader.Services
         public DbSet<Author> Authors { get; set; }
         public DbSet<Source> Sources { get; set; }
         public DbSet<Format> Formats { get; set; }
+        public DbSet<EdhrecCommander> EdhrecCommanders { get; set; }
+        public DbSet<Setting> Settings { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -47,6 +49,7 @@ namespace ScryfallDownloader.Services
             modelBuilder.Entity<Author>().HasIndex(a => a.Name).IsUnique();
             modelBuilder.Entity<Source>().HasIndex(s => s.Name).IsUnique();
             modelBuilder.Entity<Format>().HasIndex(f => f.Name).IsUnique();
+            modelBuilder.Entity<EdhrecCommander>().HasIndex(c => c.Name).IsUnique();
         }
     }
 }

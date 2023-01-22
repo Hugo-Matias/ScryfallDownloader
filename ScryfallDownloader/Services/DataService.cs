@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using ScryfallDownloader.Data;
+using ScryfallDownloader.Models;
 
 namespace ScryfallDownloader.Services
 {
@@ -7,12 +8,16 @@ namespace ScryfallDownloader.Services
     {
         private readonly IDbContextFactory<DatabaseContext> _contextFactory;
         private readonly ForgeService _forge;
+        private readonly List<string> _mainSetTypes = new() { "core", "expansion" };
+        private readonly List<string> _promoSetTypes = new() { "box", "promo", "token", "memorabilia" };
 
         public DataService(IDbContextFactory<DatabaseContext> contextFactory, ForgeService forge)
         {
             _contextFactory = contextFactory;
             _forge = forge;
         }
+
+        //Sets
 
         public async Task<Set> Create(Set set)
         {
@@ -23,6 +28,20 @@ namespace ScryfallDownloader.Services
             await context.SaveChangesAsync();
             return setEntity.Entity;
         }
+
+        public async Task<Set?> GetSet(string code, bool includeCards = false)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            if (includeCards)
+                return await context.Sets.Include(s => s.SetType)
+                                   .Include(s => s.Cards).ThenInclude(c => c.Artist)
+                                   .Include(s => s.Cards).ThenInclude(c => c.Rarity)
+                                   .FirstOrDefaultAsync(s => s.Code == code);
+            else
+                return await context.Sets.FirstOrDefaultAsync(s => s.Code == code);
+        }
+
+        //Decks
 
         public async Task<Deck> Create(Deck deck)
         {
@@ -79,6 +98,90 @@ namespace ScryfallDownloader.Services
             return deckEntity.Entity;
         }
 
+        public async Task CreateDeckEntities(List<BaseDeckModel> decks, string sourceName, string sourceLink)
+        {
+            var deckIndex = 0;
+            foreach (var deck in decks)
+            {
+                deckIndex++;
+                if (await CheckDeckExists(deck.Name, deck.Player, sourceName, deck.Date)) continue;
+
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine($"{deckIndex}/{decks.Count}||{deck.Name} - {deck.Player} - {deck.Link.PathAndQuery}");
+                Console.ResetColor();
+
+                var deckEntity = new Deck();
+                deckEntity.Name = deck.Name;
+                deckEntity.Description = deck.Description;
+                deckEntity.CreateDate = deck.Date;
+                deckEntity.UpdateDate = DateTime.Now;
+                deckEntity.Author = new Author() { Name = deck.Player };
+                deckEntity.Format = new Format() { Name = deck.Format };
+                deckEntity.Source = new Source() { Name = sourceName, Url = new Uri(sourceLink) };
+
+                var createdDeckEntity = await Create(deckEntity);
+
+                var cardIndex = 0;
+                foreach (var card in deck.Cards)
+                {
+                    cardIndex++;
+                    if (card.IsSideboard)
+                        Console.ForegroundColor = ConsoleColor.DarkCyan;
+                    Console.WriteLine($"{deckIndex}||{cardIndex}/{deck.Cards.Count}: {card.Name}");
+                    Console.ResetColor();
+
+                    var cardEntity = await GetLatestCard(card.Name, DateOnly.FromDateTime(deck.Date));
+
+                    if (cardEntity != null) await AddCardToDeck(createdDeckEntity.DeckId, cardEntity.CardId, card.Quantity, card.IsSideboard);
+                    else
+                    {
+                        Console.ForegroundColor = ConsoleColor.Red;
+                        Console.WriteLine($"----CARD NOT FOUND: {card.Name}");
+                        Console.ResetColor();
+                        if (deckEntity.MissingCards == null) deckEntity.MissingCards = new List<string>() { card.Name };
+                        else deckEntity.MissingCards.Add(card.Name);
+                    }
+                }
+                if (deckEntity.MissingCards != null) { var updatedDeck = await UpdateDeckMissingCards(deckEntity.DeckId, deckEntity.MissingCards); }
+            }
+        }
+
+        public async Task<Deck?> GetDeck(string name)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.Decks.Include(d => d.Cards).ThenInclude(c => c.Card).ThenInclude(c => c.Set)
+                                .Include(d => d.Author)
+                                .Include(d => d.Source)
+                                .Include(d => d.Format)
+                                .Include(d => d.Tags)
+                                .Include(d => d.Commander).ThenInclude(c => c.Artist)
+                                .Include(d => d.Commander).ThenInclude(c => c.Rarity)
+                                .FirstOrDefaultAsync(d => d.Name == name);
+        }
+
+        public async Task<Deck> UpdateDeckMissingCards(int deckId, ICollection<string> missingCards)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var deck = await context.Decks.FirstOrDefaultAsync(d => d.DeckId == deckId);
+            deck.MissingCards = missingCards;
+            await context.SaveChangesAsync();
+            return deck;
+        }
+
+        public async Task<bool> CheckDeckExists(string name, DateTime createDate)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.Decks.AnyAsync(d => d.Name == name && d.CreateDate == createDate);
+        }
+
+        public async Task<bool> CheckDeckExists(string name, string? authorName, string source, DateTime createDate)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.Decks.AnyAsync(d => d.Name == name && d.CreateDate == createDate && d.Author.Name == authorName && d.Source.Name == source);
+        }
+
+        // Cards
+
         public async Task<Card> Create(Card card)
         {
             using var context = await _contextFactory.CreateDbContextAsync();
@@ -108,24 +211,6 @@ namespace ScryfallDownloader.Services
             return cardEntity.Entity;
         }
 
-        public async Task<Set?> GetSet(string code, bool includeCards = false)
-        {
-            using var context = await _contextFactory.CreateDbContextAsync();
-            if (includeCards)
-                return await context.Sets.Include(s => s.SetType)
-                                   .Include(s => s.Cards).ThenInclude(c => c.Artist)
-                                   .Include(s => s.Cards).ThenInclude(c => c.Rarity)
-                                   .FirstOrDefaultAsync(s => s.Code == code);
-            else
-                return await context.Sets.FirstOrDefaultAsync(s => s.Code == code);
-        }
-
-        public async Task<SetType?> GetSetType(string name)
-        {
-            using var context = await _contextFactory.CreateDbContextAsync();
-            return await context.SetTypes.Where(s => s.Name == name).FirstOrDefaultAsync();
-        }
-
         public async Task<Card?> GetCard(string name)
         {
             using var context = await _contextFactory.CreateDbContextAsync();
@@ -145,14 +230,28 @@ namespace ScryfallDownloader.Services
                                 .FirstOrDefaultAsync(c => c.Name.ToLower().Contains(name.ToLower()) && c.Set.Code == setCode);
         }
 
-        public async Task<Card?> GetCard(string name, DateOnly date)
+        public async Task<Card?> GetLatestCard(string name, DateOnly date, bool isMainOnly = true)
         {
             using var context = await _contextFactory.CreateDbContextAsync();
-            return await context.Cards.Include(c => c.Rarity)
-                                .Include(c => c.Artist)
-                                .Include(c => c.Set)
-                                .OrderByDescending(c => c.Set.ReleaseDate)
-                                .FirstOrDefaultAsync(c => c.Name.ToLower().Contains(name.ToLower()) && c.Set.ReleaseDate <= date);
+            Card card = null;
+
+            // Check for cards only in Core and Expansion sets
+            if (isMainOnly)
+            {
+                card = await context.Cards.Include(c => c.Rarity).Include(c => c.Artist).Include(c => c.Set).ThenInclude(s => s.SetType).OrderByDescending(c => c.Set.ReleaseDate).FirstOrDefaultAsync(c => c.Name.ToLower().Contains(name.ToLower()) && c.Set.ReleaseDate <= date && _mainSetTypes.Contains(c.Set.SetType.Name) && c.Set.ForgeCode != null);
+                if (card != null) return card;
+            }
+
+            // Check for cards in reprint and special sets but not in promos or gift set types
+            card = await context.Cards.Include(c => c.Rarity).Include(c => c.Artist).Include(c => c.Set).ThenInclude(s => s.SetType).OrderByDescending(c => c.Set.ReleaseDate).FirstOrDefaultAsync(c => c.Name.ToLower().Contains(name.ToLower()) && c.Set.ReleaseDate <= date && !_promoSetTypes.Contains(c.Set.SetType.Name) && c.Set.ForgeCode != null);
+            if (card != null) return card;
+
+            // Check latest card version before date without considering set type
+            card = await context.Cards.Include(c => c.Rarity).Include(c => c.Artist).Include(c => c.Set).ThenInclude(s => s.SetType).OrderByDescending(c => c.Set.ReleaseDate).FirstOrDefaultAsync(c => c.Name.ToLower().Contains(name.ToLower()) && c.Set.ReleaseDate <= date && c.Set.ForgeCode != null);
+            if (card != null) return card;
+
+            // If all else fails, get the latest version available of all time
+            return await GetCard(name);
         }
 
         public async Task<List<Card>?> GetCards(string name)
@@ -169,52 +268,6 @@ namespace ScryfallDownloader.Services
         {
             using var context = await _contextFactory.CreateDbContextAsync();
             return await context.Cards.Where(c => c.IsImplemented == false).ToListAsync();
-        }
-
-        public async Task<Card?> UpdateCardImplementation(int cardId, bool isImplemented)
-        {
-            using var context = await _contextFactory.CreateDbContextAsync();
-            var card = await context.Cards.FirstOrDefaultAsync(c => c.CardId == cardId);
-            if (card != null)
-            {
-                card.IsImplemented = isImplemented;
-                await context.SaveChangesAsync();
-            }
-            return card;
-        }
-
-        public async Task<Deck?> GetDeck(string name)
-        {
-            using var context = await _contextFactory.CreateDbContextAsync();
-            return await context.Decks.Include(d => d.Cards).ThenInclude(c => c.Card).ThenInclude(c => c.Set)
-                                .Include(d => d.Author)
-                                .Include(d => d.Source)
-                                .Include(d => d.Format)
-                                .Include(d => d.Tags)
-                                .Include(d => d.Commander).ThenInclude(c => c.Artist)
-                                .Include(d => d.Commander).ThenInclude(c => c.Rarity)
-                                .FirstOrDefaultAsync(d => d.Name == name);
-        }
-
-        public async Task<bool> CheckDeckExists(string name, DateTime createDate)
-        {
-            using var context = await _contextFactory.CreateDbContextAsync();
-            return await context.Decks.AnyAsync(d => d.Name == name && d.CreateDate == createDate);
-        }
-
-        public async Task<bool> CheckDeckExists(string name, string authorName, DateTime createDate)
-        {
-            using var context = await _contextFactory.CreateDbContextAsync();
-            return await context.Decks.AnyAsync(d => d.Name == name && d.CreateDate == createDate && d.Author.Name == authorName);
-        }
-
-        public async Task<Deck> UpdateDeckMissingCards(int deckId, ICollection<string> missingCards)
-        {
-            using var context = await _contextFactory.CreateDbContextAsync();
-            var deck = await context.Decks.FirstOrDefaultAsync(d => d.DeckId == deckId);
-            deck.MissingCards = missingCards;
-            await context.SaveChangesAsync();
-            return deck;
         }
 
         public async Task AddCardToSet(int setId, int cardId)
@@ -254,11 +307,96 @@ namespace ScryfallDownloader.Services
             await context.SaveChangesAsync();
         }
 
+        public async Task AddCardsToDeck(Deck deck, List<DeckCard> cards)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+
+            context.Decks.Attach(deck);
+            deck.Cards = cards;
+
+            await context.SaveChangesAsync();
+        }
+
+        public async Task AddCommandersToDeck(int deckId, int commanderId, int commander2Id = -1)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var deck = await context.Decks.FirstOrDefaultAsync(d => d.DeckId == deckId);
+            deck.Commander = await context.Cards.FirstOrDefaultAsync(c => c.CardId == commanderId);
+            if (commander2Id > -1) { deck.Commander2 = await context.Cards.FirstOrDefaultAsync(c => c.CardId == commander2Id); }
+            await context.SaveChangesAsync();
+        }
+
+        public async Task<Card?> UpdateCardImplementation(int cardId, bool isImplemented)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var card = await context.Cards.FirstOrDefaultAsync(c => c.CardId == cardId);
+            if (card != null)
+            {
+                card.IsImplemented = isImplemented;
+                await context.SaveChangesAsync();
+            }
+            return card;
+        }
+
+        // Edhrec Commanders
+
+        public async Task<EdhrecCommander> Create(EdhrecCommander commander)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var dbCommander = await context.EdhrecCommanders.FirstOrDefaultAsync(c => c.Name == commander.Name);
+            if (dbCommander == null)
+            {
+                var commanderEntity = await context.EdhrecCommanders.AddAsync(commander);
+                await context.SaveChangesAsync();
+                return commanderEntity.Entity;
+            }
+            else return dbCommander;
+        }
+
+        public async Task<List<EdhrecCommander>> GetEdhrecCommanders()
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.EdhrecCommanders.ToListAsync();
+        }
+
+        public async Task<bool> CheckEdhrecCommandersPopulated()
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.EdhrecCommanders.AnyAsync();
+        }
+
+        // Set Types
+
+        public async Task<SetType?> GetSetType(string name)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.SetTypes.Where(s => s.Name == name).FirstOrDefaultAsync();
+        }
+
+        // Database
+
         public async Task RecreateDatabase()
         {
             using var context = await _contextFactory.CreateDbContextAsync();
             await context.Database.EnsureDeletedAsync();
             await context.Database.MigrateAsync();
+        }
+        public async Task<Setting> LoadSettings()
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            if (!await context.Settings.AnyAsync())
+            {
+                var setting = await context.Settings.AddAsync(new Setting());
+                return setting.Entity;
+            }
+            else return await context.Settings.FirstAsync();
+        }
+
+        public async Task SaveSettings(Setting setting)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            context.Settings.Attach(setting);
+            await context.SaveChangesAsync();
         }
     }
 }

@@ -1,7 +1,7 @@
 ﻿@page "/"
 @using System.Text.RegularExpressions;
-@inject StarCityGamesScraper SCG
 @inject DataService DB
+@inject EdhrecDownloaderService EDH
 
 <PageTitle>Deck Builder</PageTitle>
 
@@ -29,13 +29,11 @@
 <label for="before-date" class="form-label">Sets Released Before:</label>
 <input type="date" class="form-control" id="before-date" @bind-value="_beforeReleaseDate" />
 
-<button @onclick="ImportDeck">TEST</button>
-<button @onclick="async () => await App.GetMtgTop8Decks()">Get Decks</button>
-@*<button @onclick="async () => await App.GetScgDecks()">Get Decks</button>*@
-<button @onclick="InitializeDatabase">Initialize DB</button>
-<button @onclick="@(() => App.CreateMoxfieldDeckRecordsFromJson("Decks/Moxfield/moxfield_explorer.json"))">DB Decks</button>
+@*<button @onclick="ImportDeck">TEST</button>*@
+@*<button @onclick="InitializeDatabase">Initialize DB</button>*@
+@*<button @onclick="@(() => App.CreateMoxfieldDeckRecordsFromJson("Decks/Moxfield/moxfield_explorer.json"))">DB Decks</button>*@
+@*<button @onclick="App.RecheckCardImplementation">RecheckImplementation</button>*@
 <button @onclick="TEST">TestDB</button>
-<button @onclick="App.RecheckCardImplementation">RecheckImplementation</button>
 
 @code {
     [CascadingParameter]
@@ -51,7 +49,8 @@
     private async Task TEST()
     {
         //var set = DB.GetSet("lea", true);
-        var deck = await DB.GetDeck("DECK 2");
+        //var deck = await DB.GetDeck("DECK 2");
+        await EDH.Download();
     }
 
     private async Task InitializeDatabase()

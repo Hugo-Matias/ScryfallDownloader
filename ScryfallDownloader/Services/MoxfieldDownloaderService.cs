@@ -1,4 +1,5 @@
-﻿using ScryfallDownloader.Models;
+﻿using ScryfallDownloader.Data;
+using ScryfallDownloader.Models;
 using System.Text.Json;
 
 namespace ScryfallDownloader.Services
@@ -6,11 +7,30 @@ namespace ScryfallDownloader.Services
     public class MoxfieldDownloaderService
     {
         private readonly HttpClient _httpClient;
+        private readonly DataService _db;
+        private readonly IOService _io;
 
-        public MoxfieldDownloaderService(HttpClient httpClient)
+        public MoxfieldDownloaderService(HttpClient httpClient, DataService db, IOService io)
         {
             _httpClient = httpClient;
+            _db = db;
+            _io = io;
             _httpClient.BaseAddress = new Uri("https://api2.moxfield.com/v2/decks/");
+        }
+        public async Task Download()
+        {
+            //List<string> formats = new() { "alchemy", "archon", "brawl", "centurion", "conquest", "duelCommander", "explorer", "gladiator", "highlanderAustralian", "highlanderCanadian", "highlanderEuropean", "historic", "historicBrawl", "legacy", "leviathan", "oldSchool", "oathbreaker", "pauper", "pauperEdh", "pennyDreadful", "pioneer", "premodern", "primordial", "tinyLeaders", "vintage", "standard", "modern", "commander", "none" };
+            List<string> formats = new() { "none" };
+
+            List<string> formatsPrecons = new() { "precons", "commanderPrecons" };
+
+            foreach (var format in formats)
+            {
+                Console.WriteLine($"\n\n::: {format.ToUpper()} :::\n\n");
+                var decks = await GetDecks(format, "views", true);
+                //var json = JsonSerializer.Serialize<List<MoxfieldDeckModel>>(decks, new JsonSerializerOptions() { WriteIndented = true });
+                //await IO.SaveTextFile($"moxfield_{format}.json", json);
+            }
         }
 
         public async Task<List<MoxfieldDeckModel>> GetDecks(string format, string sortType, bool sortDescending)
@@ -86,6 +106,87 @@ namespace ScryfallDownloader.Services
             }
 
             return decks;
+        }
+
+        public async Task CreateMoxfieldDeckRecordsFromJson(string jsonPath)
+        {
+            var decks = _io.GetMoxfieldDecks(jsonPath);
+            var deckIndex = 0;
+            foreach (var deck in decks)
+            {
+                deckIndex++;
+                if (await _db.CheckDeckExists(deck.Name, deck.CreatedAt)) continue;
+                Console.WriteLine($"\n\nCreating Deck {deckIndex}/{decks.Count}: {deck.Name}\n");
+
+                var deckEntity = new Deck();
+                deckEntity.Name = deck.Name;
+                deckEntity.Description = $"PublicID: {deck.PublicId}";
+                deckEntity.CreateDate = deck.CreatedAt;
+                deckEntity.UpdateDate = deck.UpdatedAt;
+                deckEntity.ViewCount = deck.Views;
+                deckEntity.LikeCount = deck.Likes;
+                deckEntity.CommentCount = deck.Comments;
+                deckEntity.Author = new Author() { Name = deck.Author };
+                deckEntity.Format = new Format() { Name = deck.Format.ToLower() };
+                deckEntity.Source = new Source() { Name = "Moxfield", Url = new Uri("https://www.moxfield.com/") };
+
+                if (deck.Hubs != null)
+                {
+                    var tagList = new List<Tag>();
+                    foreach (var hub in deck.Hubs)
+                    {
+                        var tag = new Tag() { Name = hub.Name, Description = hub.Description };
+                        tagList.Add(tag);
+                    }
+                    deckEntity.Tags = tagList;
+                }
+
+                if (deck.Commanders != null)
+                {
+                    var card = await _db.GetCard(deck.Commanders[0].Name);
+                    deckEntity.Commander = card;
+                }
+
+                var createdDeckEntity = await _db.Create(deckEntity);
+
+                var cardIndex = 0;
+                Console.WriteLine("\nMainboard:");
+
+                if (deck.Mainboard != null)
+                {
+                    foreach (var card in deck.Mainboard)
+                    {
+                        cardIndex++;
+                        Console.WriteLine($"{deckIndex}||{cardIndex}/{deck.Mainboard.Count}: {card.Name}");
+
+                        var cardEntity = await _db.GetCard(card.Name, card.Set);
+
+                        if (cardEntity != null)
+                            await _db.AddCardToDeck(createdDeckEntity.DeckId, cardEntity.CardId, card.Quantity, false);
+                        else
+                            Console.WriteLine($"----CARD NOT FOUND: {card.Name} | {card.Set}");
+                    }
+                }
+
+                if (deck.Sideboard != null)
+                {
+                    cardIndex = 0;
+                    Console.WriteLine("\nSideboard:");
+
+                    foreach (var card in deck.Sideboard)
+                    {
+                        cardIndex++;
+                        Console.WriteLine($"{deckIndex}||{cardIndex}/{deck.Sideboard.Count}: {card.Name}");
+
+                        var cardEntity = await _db.GetCard(card.Name, card.Set);
+
+                        if (cardEntity != null)
+                            await _db.AddCardToDeck(createdDeckEntity.DeckId, cardEntity.CardId, card.Quantity, true);
+                        else
+                            Console.WriteLine($"----CARD NOT FOUND: {card.Name} | {card.Set}");
+                    }
+                }
+            }
         }
 
         private List<MoxfieldCardModel> ParseCardSection(JsonElement json)

@@ -9,19 +9,40 @@ namespace ScryfallDownloader.Services
     public partial class MtgTop8DownloaderService
     {
         private readonly HttpClient _httpClient;
+        private readonly DataService _db;
+        private readonly Regex _deckCodeRe;
+        private readonly Regex _eventCodeRe;
 
-        public MtgTop8DownloaderService(HttpClient httpClient)
+        public MtgTop8DownloaderService(HttpClient httpClient, DataService db)
         {
             _httpClient = httpClient;
+            _db = db;
             _httpClient.BaseAddress = new Uri("https://mtgtop8.com/");
+            _deckCodeRe = new Regex(@"d=(\d+)", RegexOptions.Compiled);
+            _eventCodeRe = new Regex(@"e=(\d+)", RegexOptions.Compiled);
         }
 
-        [GeneratedRegex("d=(\\d+)", RegexOptions.Compiled)]
-        private static partial Regex DeckCodePattern();
-        [GeneratedRegex("e=(\\d+)", RegexOptions.Compiled)]
-        private static partial Regex EventCodePattern();
+        public async Task Download()
+        {
+            var settings = await _db.LoadSettings();
+            do
+            {
+                var decks = await GetDecks(settings.MT8Page);
+                if (decks == null) break;
 
-        public async Task<List<SCGDeckModel>?> GetDecks(int currentPage)
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"=========================================================Page: {settings.MT8Page}");
+                Console.ResetColor();
+                await _db.CreateDeckEntities(decks, "MTGTop8", "https://mtgtop8.com/");
+
+                settings.MT8Page++;
+                await _db.SaveSettings(settings);
+            } while (true);
+
+            Console.WriteLine("\n\nDeck Scraping Has Finished!");
+        }
+
+        public async Task<List<BaseDeckModel>?> GetDecks(int currentPage)
         {
             var payload = new Dictionary<string, string>() { { "current_page", currentPage.ToString() } };
             var content = new FormUrlEncodedContent(payload);
@@ -34,7 +55,7 @@ namespace ScryfallDownloader.Services
             var tableRows = doc.DocumentNode.SelectNodes("//table[contains(@class, 'Stable')]/tr/td[contains(@class, 'S12')]/..");
             if (tableRows == null) return null;
 
-            var decks = new List<SCGDeckModel>();
+            var decks = new List<BaseDeckModel>();
             foreach (var row in tableRows)
             {
                 if (row.ChildNodes.Count < 17)
@@ -49,16 +70,16 @@ namespace ScryfallDownloader.Services
                 var name = cols[1].FirstChild.InnerText;
                 var link = cols[1].FirstChild.GetAttributeValue("href", "");
                 var linkUri = new Uri(_httpClient.BaseAddress + link);
-                var deckCode = DeckCodePattern().Match(link).Groups[1].Value;
-                var eventCode = EventCodePattern().Match(link).Groups[1].Value;
+                var deckCode = _deckCodeRe.Match(link).Groups[1].Value;
+                var eventCode = _eventCodeRe.Match(link).Groups[1].Value;
                 var author = cols[2].InnerText;
                 var format = cols[3].InnerText.ParseDeckFormat();
                 var gameEvent = cols[4].InnerText;
                 var rank = cols[6].InnerText;
                 var date = DateTime.ParseExact(cols[7].InnerText, "dd/MM/yy", CultureInfo.InvariantCulture);
 
-                var deck = new SCGDeckModel() { Name = name, Link = linkUri, Player = author, Event = gameEvent, Format = format, Date = date };
-                deck.Description = $"Deck Code:{deckCode}\nEvent Code: {eventCode}\nRank: {rank}";
+                var deck = new BaseDeckModel() { Name = name, Link = linkUri, Player = author, Event = gameEvent, Format = format, Date = date };
+                deck.Description = $"Deck Code: {deckCode}\nEvent Code: {eventCode}\nRank: {rank}\nEvent: {gameEvent}";
                 deck.Cards = await GetCards(deckCode);
 
                 decks.Add(deck);
@@ -66,11 +87,11 @@ namespace ScryfallDownloader.Services
             return decks;
         }
 
-        private async Task<List<SCGCardModel>> GetCards(string code)
+        private async Task<List<BaseCardModel>> GetCards(string code)
         {
             var response = await _httpClient.GetStringAsync($"mtgo?d={code}");
 
-            List<SCGCardModel> deck = new();
+            List<BaseCardModel> deck = new();
             var section = "mainboard";
 
             foreach (var line in response.SplitToLines())
@@ -88,7 +109,7 @@ namespace ScryfallDownloader.Services
                 // Flip and double faced cards name separator is a single slash for MT8 but our database's convention is a double slash,
                 // To find the proper card we need to parse the name accordingly.
                 name = name.Replace(" / ", " // ");
-                deck.Add(new SCGCardModel { Name = name, Quantity = quantity, IsSideboard = section != "mainboard" });
+                deck.Add(new BaseCardModel { Name = name, Quantity = quantity, IsSideboard = section != "mainboard" });
             }
 
             return deck;
