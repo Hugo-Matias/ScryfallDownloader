@@ -50,12 +50,24 @@
 
     private async Task TEST()
     {
-        await App.InitializeDatabase(false);
+        //await App.InitializeDatabase(false);
         //var set = DB.GetSet("lea", true);
         //var deck = await DB.GetDeck("DECK 2");
         //await Downloader.MtgWtfDownload();
-        //var deck = await Generator.GenerateDeck(47496);
-        //if (!string.IsNullOrWhiteSpace(deck)) await IO.SaveTextFile("test.dck", deck);
+        //var deck = await Generator.GenerateDeck(23201);
+        var deckIds = await DB.GetDeckIdsBySource(5);
+        var startTime = DateTime.Now;
+        var deckIndex = 0;
+        foreach (var id in deckIds)
+        {
+            deckIndex++;
+            if (deckIndex < 344) continue;
+            var elapsedTime = DateTime.Now - startTime;
+            Console.WriteLine($"Elapsed Time: {elapsedTime:h'h 'm'm 's's'} | {deckIndex}/{deckIds.Count}");
+            var deck = await Generator.GenerateDeck(id);
+            if (!string.IsNullOrWhiteSpace(deck.Item2)) await IO.SaveTextFile($"./Decks/MTGWTF/{id} - {deck.Item1.CleanIllegalCharacters()}.dck", deck.Item2);
+        }
+        Console.WriteLine("Finished Generation!");
     }
 
     private async Task InitializeDatabase()

@@ -252,7 +252,7 @@
             card.CollectorsNumber = setCard.CollectorNumber;
             card.Rarity = new Rarity() { Name = setCard.Rarity, Symbol = setCard.Rarity.ToUpper()[0] };
             card.Artist = new Artist() { Name = setCard.Artist };
-            card.Layout = setCard.Layout;
+            card.Layout = new Layout() { Name = setCard.Layout };
             card.ConvertedManaCost = setCard.Cmc;
             card.IsHighres = setCard.HighresImage;
             if (setCard.CardFaces == null || setCard.CardFaces.Length == 0 || setCard.Layout.ToLower() == "flip")

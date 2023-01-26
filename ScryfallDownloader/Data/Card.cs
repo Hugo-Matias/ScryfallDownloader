@@ -14,7 +14,7 @@ namespace ScryfallDownloader.Data
         public Set Set { get; set; }
         public bool IsImplemented { get; set; }
         public ICollection<DeckCard> Decks { get; set; }
-        public string Layout { get; set; }
+        public Layout? Layout { get; set; }
         public decimal ConvertedManaCost { get; set; }
         public ICollection<CardKeyword> Keywords { get; set; }
         public ICollection<CardColor> Colors { get; set; }

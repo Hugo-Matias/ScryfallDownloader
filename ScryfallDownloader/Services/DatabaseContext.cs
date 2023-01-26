@@ -28,6 +28,7 @@ namespace ScryfallDownloader.Services
         public DbSet<Color> Colors { get; set; }
         public DbSet<CardColor> CardColors { get; set; }
         public DbSet<CardGenerateColor> CardGenerateColors { get; set; }
+        public DbSet<Layout> Layouts { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -45,6 +46,7 @@ namespace ScryfallDownloader.Services
                 );
 
             modelBuilder.Entity<Deck>().Property(nameof(Deck.MissingCards)).HasConversion(splitStringConverter, splitStringComparer);
+            modelBuilder.Entity<Setting>().Property(nameof(Setting.MissingCardDecks)).HasConversion(splitStringConverter, splitStringComparer);
 
             modelBuilder.Entity<DeckCard>().HasKey(e => new { e.DeckId, e.CardId, e.IsSideboard });
             modelBuilder.Entity<CardColor>().HasKey(e => new { e.CardId, e.ColorId });
@@ -62,6 +64,7 @@ namespace ScryfallDownloader.Services
             modelBuilder.Entity<Keyword>().HasIndex(e => e.Name).IsUnique();
             modelBuilder.Entity<Color>().HasIndex(e => e.Name).IsUnique();
             modelBuilder.Entity<Set>().HasIndex(e => e.Code).IsUnique();
+            modelBuilder.Entity<Layout>().HasIndex(e => e.Name).IsUnique();
         }
     }
 }

@@ -1,73 +1,169 @@
 ﻿using ScryfallDownloader.Data;
+using ScryfallDownloader.Extensions;
 
 namespace ScryfallDownloader.Services
 {
     public class DeckGeneratorService
     {
         private readonly DataService _db;
+        private readonly List<string> _specialLayouts = new() { "vanguard", "planar", "scheme" };
 
         public DeckGeneratorService(DataService db)
         {
             _db = db;
         }
 
-        public async Task<string> GenerateDeck(int deckId)
+        public async Task<(string, string)> GenerateDeck(int deckId)
         {
+            var settings = await _db.LoadSettings();
+
             var deck = await _db.GetDeck(deckId);
-            if (deck == null) return string.Empty;
+            if (deck == null) return (string.Empty, string.Empty);
+            if (deck.Cards.Any(c => !c.Card.IsImplemented))
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"Deck contains unimplemented cards: ID:{deck.DeckId} | {deck.Name}\nCanceling generation...");
+                Console.ResetColor();
+                //foreach (var card in deck.Cards)
+                //{
+                //    if (!card.Card.IsImplemented) Console.WriteLine($"{card.CardId}: {card.Card.Name}");
+                //}
+                settings.MissingCardDecks ??= new List<string>();
+                settings.MissingCardDecks.Add(deck.DeckId.ToString());
+                await _db.SaveSettings(settings);
+                return (string.Empty, string.Empty);
+            }
             if (deck.Cards.Any(c => c.Card.Set.ForgeCode == null))
             {
-                Console.WriteLine($"Deck contains unimplemented cards: ID:{deck.DeckId} | {deck.Name}");
-                foreach (var card in deck.Cards) { if (card.Card.Set.ForgeCode == null) Console.WriteLine($"{card.CardId}: {card.Card.Name}"); }
-                return string.Empty;
+                Console.WriteLine($"Deck contains missing editions: ID:{deck.DeckId} | {deck.Name}\nTrying to find other prints for missing cards...");
+                var newDeck = new List<DeckCard>();
+                foreach (var card in deck.Cards)
+                {
+                    if (card.Card.Set.ForgeCode == null)
+                    {
+                        Console.WriteLine($"{card.CardId}: {card.Card.Name} | {card.Card.Set.Code}");
+                        var newCard = await _db.GetLatestCard(card.Card.Name, DateOnly.FromDateTime(deck.CreateDate), false);
+                        if (newCard != null && newCard.Set.ForgeCode != null) { newDeck.Add(new DeckCard() { Card = newCard, Quantity = card.Quantity, IsSideboard = card.IsSideboard }); }
+                        else
+                        {
+                            Console.ForegroundColor = ConsoleColor.Red;
+                            Console.WriteLine($"Card not found:\nID:{card.Card.CardId} | {card.Card.Name}\nCanceling generation...");
+                            Console.ResetColor();
+
+                            settings.MissingCardDecks ??= new List<string>();
+                            settings.MissingCardDecks.Add(deck.DeckId.ToString());
+                            await _db.SaveSettings(settings);
+                            return (string.Empty, string.Empty);
+                        }
+                    }
+                    else newDeck.Add(card);
+                }
+                deck.Cards = newDeck;
             }
 
             Console.ForegroundColor = ConsoleColor.Green;
             Console.WriteLine($"Generating Deck: {deck.DeckId} | {deck.Name}");
             Console.ResetColor();
 
-            deck.Cards = await GenerateVariations(deck);
+            List<DeckCard> specialCards = deck.Cards.Where(c => _specialLayouts.Contains(c.Card.Layout.Name) || c.Card.Type.ToLower().StartsWith("conspiracy") || c.Card.Type.ToLower().StartsWith("Dungeon")).ToList();
+
+            deck.Cards = deck.Cards.Except(specialCards).ToList();
 
             List<DeckCard> mainCards = deck.Cards.Where(c => c.IsSideboard == false).ToList();
-            var mainboard = string.Join("\n", mainCards.Select(c => $"{c.Quantity} {c.Card.Name}|{c.Card.Set.ForgeCode.ToUpper()}").ToArray());
-
             List<DeckCard> sideCards = deck.Cards.Where(c => c.IsSideboard == true).ToList();
-            var sideboard = string.Join("\n", sideCards.Select(c => $"{c.Quantity} {c.Card.Name}|{c.Card.Set.ForgeCode.ToUpper()}").ToArray());
 
             Card? commander = null;
-            if (deck.Commander != null) commander = deck.Commander;
-            if (commander.Set.ForgeCode == null) { Console.WriteLine($"Commander card not implemented: ID:{commander.CardId} | {commander.Name}"); return string.Empty; }
+            if (deck.Commander != null)
+            {
+                commander = await _db.GetLatestCard(deck.Commander.Name, DateOnly.FromDateTime(deck.CreateDate), false);
+                if (commander == null)
+                {
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"Commander card not implemented:\n{commander.CardId}: {commander.Name}\nDeck ID:{deck.DeckId}");
+                    Console.ResetColor();
+                    return (string.Empty, string.Empty);
+                }
 
-            return $"[metadata]\nName={deck.Name}\n[main]\n{mainboard}{(sideCards.Count > 0 ? $"\n[sideboard]\n{sideboard}" : "")}{(commander != null ? $"\n[commander]\n1 {commander.Name}|{commander.Set.ForgeCode.ToUpper()}" : "")}";
+                if (commander.Name.Contains(" // ")) commander.Name = commander.Name.ParseSplitCardname();
+            }
+
+            return (deck.Name, await GenerateDeckString(deck.Name, mainCards, sideCards, specialCards, commander));
         }
 
-        private async Task<List<DeckCard>> GenerateVariations(Deck deck)
+        private async Task<List<string>?> GenerateCardList(List<DeckCard> cards)
         {
-            List<DeckCard> newDecklist = new();
+            List<string> cardlist = new();
 
-            var setIds = deck.Cards.Select(c => c.Card.Set.SetId).Distinct().ToList();
+
+            var setIds = cards.Select(c => c.Card.Set.SetId).Distinct().ToList();
             List<Set> sets = new();
             foreach (var set in setIds)
             {
                 sets.Add(await _db.GetSet(set, true));
             }
 
-            foreach (var card in deck.Cards)
+            foreach (var card in cards)
             {
-                if (card.Quantity == 1) { newDecklist.Add(card); continue; }
+                if (card.Card.Set == null || card.Card.Set.ForgeCode == null) return null;
+
+                var cardName = card.Card.Name;
+                if (cardName.Contains(" // ") && card.Card.Layout.Name != "split") cardName = cardName.ParseSplitCardname();
+
+                if (card.Quantity == 1) { cardlist.Add($"1 {cardName}|{card.Card.Set.ForgeCode.ToUpper()}"); continue; }
 
                 var setCards = sets.FirstOrDefault(s => s.SetId == card.Card.Set.SetId).Cards.Where(c => c.Name == card.Card.Name).ToList();
-                if (setCards.Count == 1) { newDecklist.Add(card); continue; }
+                if (setCards.Count == 1) { cardlist.Add($"{card.Quantity} {cardName}|{card.Card.Set.ForgeCode.ToUpper()}"); continue; }
 
                 var variations = CalculateVariations(card.Quantity, setCards.Count);
 
                 for (var i = 1; i <= variations.Count; i++)
                 {
-
+                    if (variations[i - 1] == 0) break;
+                    cardlist.Add($"{variations[i - 1]} {cardName}|{card.Card.Set.ForgeCode.ToUpper()}|{i}");
                 }
             }
 
-            return newDecklist;
+            return cardlist;
+        }
+
+        private async Task<string> GenerateDeckString(string deckName, List<DeckCard> mainCards, List<DeckCard>? sideCards = null, List<DeckCard>? specialCards = null, Card? commander = null)
+        {
+            var deckString = string.Empty;
+
+            deckString += $"[Metadata]\nName={deckName}\n";
+            deckString += $"[Main]\n{string.Join("\n", await GenerateCardList(mainCards))}";
+
+            if (sideCards.Count > 0)
+                deckString += $"\n[Sideboard]\n{string.Join("\n", await GenerateCardList(sideCards))}";
+
+            if (commander != null)
+                deckString += $"\n[Commander]\n1 {commander.Name}|{commander.Set.ForgeCode.ToUpper()}";
+
+            if (specialCards != null)
+            {
+                List<DeckCard> vanguard = new();
+                List<DeckCard> planar = new();
+                List<DeckCard> scheme = new();
+                List<DeckCard> conspiracy = new();
+                List<DeckCard> dungeon = new();
+
+                foreach (var card in specialCards)
+                {
+                    if (card.Card.Layout.Name == "vanguard") vanguard.Add(card);
+                    if (card.Card.Layout.Name == "planar") planar.Add(card);
+                    if (card.Card.Layout.Name == "scheme") scheme.Add(card);
+                    if (card.Card.Type.ToLower().StartsWith("conspiracy")) conspiracy.Add(card);
+                    if (card.Card.Type.ToLower().StartsWith("dungeon")) dungeon.Add(card);
+                }
+
+                if (vanguard.Count > 0) deckString += $"[Avatar]{string.Join("\n", await GenerateCardList(vanguard))}";
+                if (planar.Count > 0) deckString += $"[Planes]{string.Join("\n", await GenerateCardList(planar))}";
+                if (scheme.Count > 0) deckString += $"[Schemes]{string.Join("\n", await GenerateCardList(scheme))}";
+                if (conspiracy.Count > 0) deckString += $"[Conspiracy]{string.Join("\n", await GenerateCardList(conspiracy))}";
+                if (dungeon.Count > 0) deckString += $"[Dungeon]{string.Join("\n", await GenerateCardList(dungeon))}";
+            }
+
+            return deckString;
         }
 
         private List<int> CalculateVariations(int quantity, int variations)

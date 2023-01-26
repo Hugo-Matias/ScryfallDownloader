@@ -7,14 +7,12 @@ namespace ScryfallDownloader.Services
     public class DataService
     {
         private readonly IDbContextFactory<DatabaseContext> _contextFactory;
-        private readonly ForgeService _forge;
         private readonly List<string> _mainSetTypes = new() { "core", "expansion" };
         private readonly List<string> _promoSetTypes = new() { "box", "promo", "token", "memorabilia" };
 
-        public DataService(IDbContextFactory<DatabaseContext> contextFactory, ForgeService forge)
+        public DataService(IDbContextFactory<DatabaseContext> contextFactory)
         {
             _contextFactory = contextFactory;
-            _forge = forge;
         }
 
         //Sets
@@ -161,21 +159,30 @@ namespace ScryfallDownloader.Services
         public async Task<Deck?> GetDeck(string name)
         {
             using var context = await _contextFactory.CreateDbContextAsync();
-            return await context.Decks.Include(d => d.Cards).ThenInclude(c => c.Card).ThenInclude(c => c.Set).ThenInclude(s => s.SetType)
-                                .Include(d => d.Author)
-                                .Include(d => d.Source)
-                                .Include(d => d.Format)
-                                .Include(d => d.Tags)
-                                .Include(d => d.Commander).ThenInclude(c => c.Artist)
-                                .Include(d => d.Commander).ThenInclude(c => c.Rarity)
-                                .AsSplitQuery()
-                                .FirstOrDefaultAsync(d => d.Name == name);
+            return await context.Decks.Include(d => d.Cards)
+                                      .ThenInclude(c => c.Card)
+                                      .ThenInclude(c => c.Set)
+                                      .ThenInclude(s => s.SetType)
+                                      .Include(d => d.Cards)
+                                      .ThenInclude(c => c.Card)
+                                      .ThenInclude(c => c.Layout)
+                                      .Include(d => d.Author)
+                                      .Include(d => d.Source)
+                                      .Include(d => d.Format)
+                                      .Include(d => d.Tags)
+                                      .Include(d => d.Commander)
+                                      .ThenInclude(c => c.Artist)
+                                      .Include(d => d.Commander)
+                                      .ThenInclude(c => c.Rarity)
+                                      .AsSplitQuery()
+                                      .FirstOrDefaultAsync(d => d.Name == name);
         }
 
         public async Task<Deck?> GetDeck(int deckId)
         {
             using var context = await _contextFactory.CreateDbContextAsync();
             return await context.Decks.Include(d => d.Cards).ThenInclude(c => c.Card).ThenInclude(c => c.Set).ThenInclude(s => s.SetType)
+                                      .Include(d => d.Cards).ThenInclude(c => c.Card).ThenInclude(c => c.Layout)
                                       .Include(d => d.Author)
                                       .Include(d => d.Source)
                                       .Include(d => d.Format)
@@ -184,6 +191,12 @@ namespace ScryfallDownloader.Services
                                       .Include(d => d.Commander).ThenInclude(c => c.Rarity)
                                       .AsSplitQuery()
                                       .FirstOrDefaultAsync(d => d.DeckId == deckId);
+        }
+
+        public async Task<List<int>> GetDeckIdsBySource(int sourceId)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.Decks.Where(d => d.Source.SourceId == sourceId).Select(d => d.DeckId).ToListAsync();
         }
 
         public async Task<Deck> UpdateDeckMissingCards(int deckId, ICollection<string> missingCards)
@@ -244,6 +257,7 @@ namespace ScryfallDownloader.Services
             var card = await context.Cards.Include(c => c.Rarity)
                                 .Include(c => c.Artist)
                                 .Include(c => c.Set)
+                                .Include(c => c.Layout)
                                 .OrderByDescending(c => c.Set.ReleaseDate)
                                 .FirstOrDefaultAsync(c => c.Name.ToLower().Contains(name.ToLower()));
             if (card == null)
@@ -261,6 +275,7 @@ namespace ScryfallDownloader.Services
             var card = await context.Cards.Include(c => c.Rarity)
                                 .Include(c => c.Artist)
                                 .Include(c => c.Set)
+                                .Include(c => c.Layout)
                                 .FirstOrDefaultAsync(c => c.Name.ToLower().Contains(name.ToLower()) && c.Set.Code.ToLower() == setCode.ToLower());
             if (card == null)
             {
@@ -279,18 +294,18 @@ namespace ScryfallDownloader.Services
             // Check for cards only in Core and Expansion sets
             if (isMainOnly)
             {
-                card = await context.Cards.Include(c => c.Rarity).Include(c => c.Artist).Include(c => c.Set).ThenInclude(s => s.SetType).OrderByDescending(c => c.Set.ReleaseDate).FirstOrDefaultAsync(c => c.Name.ToLower().Contains(name.ToLower()) && c.Set.ReleaseDate <= date && _mainSetTypes.Contains(c.Set.SetType.Name) && c.Set.ForgeCode != null);
+                card = await context.Cards.Include(c => c.Rarity).Include(c => c.Artist).Include(c => c.Layout).Include(c => c.Set).ThenInclude(s => s.SetType).OrderByDescending(c => c.Set.ReleaseDate).FirstOrDefaultAsync(c => c.Name.ToLower().Contains(name.ToLower()) && c.Set.ReleaseDate <= date && _mainSetTypes.Contains(c.Set.SetType.Name) && c.Set.ForgeCode != null);
                 if (card != null) return card;
                 else Console.WriteLine($"Card not found on MAIN sets: {name} | {date}");
             }
 
             // Check for cards in reprint and special sets but not in promos or gift set types
-            card = await context.Cards.Include(c => c.Rarity).Include(c => c.Artist).Include(c => c.Set).ThenInclude(s => s.SetType).OrderByDescending(c => c.Set.ReleaseDate).FirstOrDefaultAsync(c => c.Name.ToLower().Contains(name.ToLower()) && c.Set.ReleaseDate <= date && !_promoSetTypes.Contains(c.Set.SetType.Name) && c.Set.ForgeCode != null);
+            card = await context.Cards.Include(c => c.Rarity).Include(c => c.Artist).Include(c => c.Layout).Include(c => c.Set).ThenInclude(s => s.SetType).OrderByDescending(c => c.Set.ReleaseDate).FirstOrDefaultAsync(c => c.Name.ToLower().Contains(name.ToLower()) && c.Set.ReleaseDate <= date && !_promoSetTypes.Contains(c.Set.SetType.Name) && c.Set.ForgeCode != null);
             if (card != null) return card;
             else Console.WriteLine($"Card not found on REPRINT sets: {name} | {date}");
 
             // Check latest card version before date without considering set type
-            card = await context.Cards.Include(c => c.Rarity).Include(c => c.Artist).Include(c => c.Set).ThenInclude(s => s.SetType).OrderByDescending(c => c.Set.ReleaseDate).FirstOrDefaultAsync(c => c.Name.ToLower().Contains(name.ToLower()) && c.Set.ReleaseDate <= date && c.Set.ForgeCode != null);
+            card = await context.Cards.Include(c => c.Rarity).Include(c => c.Artist).Include(c => c.Layout).Include(c => c.Set).ThenInclude(s => s.SetType).OrderByDescending(c => c.Set.ReleaseDate).FirstOrDefaultAsync(c => c.Name.ToLower().Contains(name.ToLower()) && c.Set.ReleaseDate <= date && c.Set.ForgeCode != null);
             if (card != null) return card;
             else Console.WriteLine($"Card not found before date: {name} | {date}");
 
@@ -303,6 +318,7 @@ namespace ScryfallDownloader.Services
             using var context = await _contextFactory.CreateDbContextAsync();
             return await context.Cards.Include(c => c.Artist)
                                 .Include(c => c.Rarity)
+                                .Include(c => c.Layout)
                                 .Include(c => c.Set)
                                 .Where(c => c.Name.ToLower().Contains(name.ToLower()))
                                 .ToListAsync();
@@ -336,7 +352,6 @@ namespace ScryfallDownloader.Services
             cardEntity.CollectorsNumber = card.CollectorsNumber;
             cardEntity.SetId = setId;
             cardEntity.IsImplemented = card.IsImplemented;
-            cardEntity.Layout = card.Layout;
             cardEntity.ConvertedManaCost = card.ConvertedManaCost;
             cardEntity.IsHighres = card.IsHighres;
             cardEntity.ImageUrl = card.ImageUrl;
@@ -353,6 +368,9 @@ namespace ScryfallDownloader.Services
 
             var rarityEntity = await context.Rarities.FirstOrDefaultAsync(r => r.Name == card.Rarity.Name);
             cardEntity.Rarity = rarityEntity != null ? rarityEntity : card.Rarity;
+
+            var layoutEntity = await context.Layouts.FirstOrDefaultAsync(l => l.Name == card.Layout.Name);
+            cardEntity.Layout = layoutEntity != null ? layoutEntity : card.Layout;
 
             if (card.Keywords != null && card.Keywords.Count > 0)
             {
@@ -579,6 +597,7 @@ namespace ScryfallDownloader.Services
             if (!await context.Settings.AnyAsync())
             {
                 var setting = await context.Settings.AddAsync(new Setting());
+                await context.SaveChangesAsync();
                 return setting.Entity;
             }
             else return await context.Settings.AsNoTracking().OrderBy(s => s.SettingId).FirstAsync();

@@ -19,7 +19,7 @@ namespace ScryfallDownloader.Extensions
             return removeIllegalChars ? CleanIllegalCharacters(newString) : newString;
         }
 
-        private static string RemoveDiacritics(this string text)
+        public static string RemoveDiacritics(this string text)
         {
             var normalizedString = text.Normalize(NormalizationForm.FormD);
             var stringBuilder = new StringBuilder();
@@ -36,7 +36,7 @@ namespace ScryfallDownloader.Extensions
             return stringBuilder.ToString().Normalize(NormalizationForm.FormC);
         }
 
-        private static string CleanIllegalCharacters(this string filename) => Path.GetInvalidFileNameChars().Aggregate(filename, (current, c) => current.Replace(c.ToString(), string.Empty));
+        public static string CleanIllegalCharacters(this string filename) => Path.GetInvalidFileNameChars().Aggregate(filename, (current, c) => current.Replace(c.ToString(), string.Empty));
 
         /// <summary>
         /// Try parsing a string into an integer by removing non-digit characters.

@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ScryfallDownloader.Services;
 
@@ -10,9 +11,11 @@ using ScryfallDownloader.Services;
 namespace ScryfallDownloader.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    partial class DownloaderContextModelSnapshot : ModelSnapshot
+    [Migration("20230126135710_Add MissingCardDecks Setting")]
+    partial class AddMissingCardDecksSetting
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "7.0.2");
@@ -80,8 +83,9 @@ namespace ScryfallDownloader.Migrations
                     b.Property<bool>("IsImplemented")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int?>("LayoutId")
-                        .HasColumnType("INTEGER");
+                    b.Property<string>("Layout")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("LifeModifier")
                         .HasColumnType("TEXT");
@@ -115,8 +119,6 @@ namespace ScryfallDownloader.Migrations
                     b.HasKey("CardId");
 
                     b.HasIndex("ArtistId");
-
-                    b.HasIndex("LayoutId");
 
                     b.HasIndex("RarityId");
 
@@ -338,24 +340,6 @@ namespace ScryfallDownloader.Migrations
                     b.ToTable("Keywords");
                 });
 
-            modelBuilder.Entity("ScryfallDownloader.Data.Layout", b =>
-                {
-                    b.Property<int>("LayoutId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("LayoutId");
-
-                    b.HasIndex("Name")
-                        .IsUnique();
-
-                    b.ToTable("Layouts");
-                });
-
             modelBuilder.Entity("ScryfallDownloader.Data.Rarity", b =>
                 {
                     b.Property<int>("RarityId")
@@ -527,10 +511,6 @@ namespace ScryfallDownloader.Migrations
                         .WithMany()
                         .HasForeignKey("ArtistId");
 
-                    b.HasOne("ScryfallDownloader.Data.Layout", "Layout")
-                        .WithMany()
-                        .HasForeignKey("LayoutId");
-
                     b.HasOne("ScryfallDownloader.Data.Rarity", "Rarity")
                         .WithMany()
                         .HasForeignKey("RarityId");
@@ -542,8 +522,6 @@ namespace ScryfallDownloader.Migrations
                         .IsRequired();
 
                     b.Navigation("Artist");
-
-                    b.Navigation("Layout");
 
                     b.Navigation("Rarity");
 
