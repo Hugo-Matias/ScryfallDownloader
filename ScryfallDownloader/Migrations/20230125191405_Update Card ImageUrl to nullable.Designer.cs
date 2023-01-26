@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ScryfallDownloader.Services;
 
@@ -10,9 +11,11 @@ using ScryfallDownloader.Services;
 namespace ScryfallDownloader.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    partial class DownloaderContextModelSnapshot : ModelSnapshot
+    [Migration("20230125191405_Update Card ImageUrl to nullable")]
+    partial class UpdateCardImageUrltonullable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "7.0.2");
@@ -420,9 +423,6 @@ namespace ScryfallDownloader.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<int>("EDHDeck")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("ImportSet")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("MT8Page")

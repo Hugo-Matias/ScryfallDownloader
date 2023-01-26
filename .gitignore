@@ -8,6 +8,7 @@ Decks
 *.db
 *.db-shm
 *.db-wal
+*.dck
 
 # User-specific files
 *.rsuser

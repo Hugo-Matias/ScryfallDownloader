@@ -29,6 +29,18 @@ namespace ScryfallDownloader.Services
             return setEntity.Entity;
         }
 
+        public async Task<Set?> GetSet(int id, bool includeCards = false)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            if (includeCards)
+                return await context.Sets.Include(s => s.SetType)
+                                   .Include(s => s.Cards).ThenInclude(c => c.Artist)
+                                   .Include(s => s.Cards).ThenInclude(c => c.Rarity)
+                                   .FirstOrDefaultAsync(s => s.SetId == id);
+            else
+                return await context.Sets.Include(s => s.SetType).FirstOrDefaultAsync(s => s.SetId == id);
+        }
+
         public async Task<Set?> GetSet(string code, bool includeCards = false)
         {
             using var context = await _contextFactory.CreateDbContextAsync();
@@ -38,7 +50,7 @@ namespace ScryfallDownloader.Services
                                    .Include(s => s.Cards).ThenInclude(c => c.Rarity)
                                    .FirstOrDefaultAsync(s => s.Code == code);
             else
-                return await context.Sets.FirstOrDefaultAsync(s => s.Code == code);
+                return await context.Sets.Include(s => s.SetType).FirstOrDefaultAsync(s => s.Code == code);
         }
 
         //Decks
@@ -149,14 +161,29 @@ namespace ScryfallDownloader.Services
         public async Task<Deck?> GetDeck(string name)
         {
             using var context = await _contextFactory.CreateDbContextAsync();
-            return await context.Decks.Include(d => d.Cards).ThenInclude(c => c.Card).ThenInclude(c => c.Set)
+            return await context.Decks.Include(d => d.Cards).ThenInclude(c => c.Card).ThenInclude(c => c.Set).ThenInclude(s => s.SetType)
                                 .Include(d => d.Author)
                                 .Include(d => d.Source)
                                 .Include(d => d.Format)
                                 .Include(d => d.Tags)
                                 .Include(d => d.Commander).ThenInclude(c => c.Artist)
                                 .Include(d => d.Commander).ThenInclude(c => c.Rarity)
+                                .AsSplitQuery()
                                 .FirstOrDefaultAsync(d => d.Name == name);
+        }
+
+        public async Task<Deck?> GetDeck(int deckId)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.Decks.Include(d => d.Cards).ThenInclude(c => c.Card).ThenInclude(c => c.Set).ThenInclude(s => s.SetType)
+                                      .Include(d => d.Author)
+                                      .Include(d => d.Source)
+                                      .Include(d => d.Format)
+                                      .Include(d => d.Tags)
+                                      .Include(d => d.Commander).ThenInclude(c => c.Artist)
+                                      .Include(d => d.Commander).ThenInclude(c => c.Rarity)
+                                      .AsSplitQuery()
+                                      .FirstOrDefaultAsync(d => d.DeckId == deckId);
         }
 
         public async Task<Deck> UpdateDeckMissingCards(int deckId, ICollection<string> missingCards)
@@ -214,20 +241,34 @@ namespace ScryfallDownloader.Services
         public async Task<Card?> GetCard(string name)
         {
             using var context = await _contextFactory.CreateDbContextAsync();
-            return await context.Cards.Include(c => c.Rarity)
+            var card = await context.Cards.Include(c => c.Rarity)
                                 .Include(c => c.Artist)
                                 .Include(c => c.Set)
                                 .OrderByDescending(c => c.Set.ReleaseDate)
                                 .FirstOrDefaultAsync(c => c.Name.ToLower().Contains(name.ToLower()));
+            if (card == null)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"Missing Card: {name}");
+                Console.ResetColor();
+            }
+            return card;
         }
 
         public async Task<Card?> GetCard(string name, string setCode)
         {
             using var context = await _contextFactory.CreateDbContextAsync();
-            return await context.Cards.Include(c => c.Rarity)
+            var card = await context.Cards.Include(c => c.Rarity)
                                 .Include(c => c.Artist)
                                 .Include(c => c.Set)
-                                .FirstOrDefaultAsync(c => c.Name.ToLower().Contains(name.ToLower()) && c.Set.Code == setCode);
+                                .FirstOrDefaultAsync(c => c.Name.ToLower().Contains(name.ToLower()) && c.Set.Code.ToLower() == setCode.ToLower());
+            if (card == null)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"Missing Card: {name} | {setCode}");
+                Console.ResetColor();
+            }
+            return card;
         }
 
         public async Task<Card?> GetLatestCard(string name, DateOnly date, bool isMainOnly = true)
@@ -240,15 +281,18 @@ namespace ScryfallDownloader.Services
             {
                 card = await context.Cards.Include(c => c.Rarity).Include(c => c.Artist).Include(c => c.Set).ThenInclude(s => s.SetType).OrderByDescending(c => c.Set.ReleaseDate).FirstOrDefaultAsync(c => c.Name.ToLower().Contains(name.ToLower()) && c.Set.ReleaseDate <= date && _mainSetTypes.Contains(c.Set.SetType.Name) && c.Set.ForgeCode != null);
                 if (card != null) return card;
+                else Console.WriteLine($"Card not found on MAIN sets: {name} | {date}");
             }
 
             // Check for cards in reprint and special sets but not in promos or gift set types
             card = await context.Cards.Include(c => c.Rarity).Include(c => c.Artist).Include(c => c.Set).ThenInclude(s => s.SetType).OrderByDescending(c => c.Set.ReleaseDate).FirstOrDefaultAsync(c => c.Name.ToLower().Contains(name.ToLower()) && c.Set.ReleaseDate <= date && !_promoSetTypes.Contains(c.Set.SetType.Name) && c.Set.ForgeCode != null);
             if (card != null) return card;
+            else Console.WriteLine($"Card not found on REPRINT sets: {name} | {date}");
 
             // Check latest card version before date without considering set type
             card = await context.Cards.Include(c => c.Rarity).Include(c => c.Artist).Include(c => c.Set).ThenInclude(s => s.SetType).OrderByDescending(c => c.Set.ReleaseDate).FirstOrDefaultAsync(c => c.Name.ToLower().Contains(name.ToLower()) && c.Set.ReleaseDate <= date && c.Set.ForgeCode != null);
             if (card != null) return card;
+            else Console.WriteLine($"Card not found before date: {name} | {date}");
 
             // If all else fails, get the latest version available of all time
             return await GetCard(name);
@@ -281,6 +325,88 @@ namespace ScryfallDownloader.Services
             await context.SaveChangesAsync();
         }
 
+        public async Task AddCardToSet(int setId, Card card)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var cardEntity = await context.Cards.Include(c => c.Artist).Include(c => c.Rarity).Include(c => c.Set).ThenInclude(s => s.SetType).FirstOrDefaultAsync(c => c.Name == card.Name && c.Set.SetId == setId && c.CollectorsNumber == card.CollectorsNumber);
+
+            cardEntity ??= new();
+
+            cardEntity.Name = card.Name;
+            cardEntity.CollectorsNumber = card.CollectorsNumber;
+            cardEntity.SetId = setId;
+            cardEntity.IsImplemented = card.IsImplemented;
+            cardEntity.Layout = card.Layout;
+            cardEntity.ConvertedManaCost = card.ConvertedManaCost;
+            cardEntity.IsHighres = card.IsHighres;
+            cardEntity.ImageUrl = card.ImageUrl;
+            cardEntity.Type = card.Type;
+            cardEntity.ManaCost = card.ManaCost;
+            cardEntity.Power = card.Power;
+            cardEntity.Toughness = card.Toughness;
+            cardEntity.Loyalty = card.Loyalty;
+            cardEntity.LifeModifier = card.LifeModifier;
+            cardEntity.HandModifier = card.HandModifier;
+
+            var artistEntity = await context.Artists.FirstOrDefaultAsync(a => a.Name == card.Artist.Name);
+            cardEntity.Artist = artistEntity != null ? artistEntity : card.Artist;
+
+            var rarityEntity = await context.Rarities.FirstOrDefaultAsync(r => r.Name == card.Rarity.Name);
+            cardEntity.Rarity = rarityEntity != null ? rarityEntity : card.Rarity;
+
+            if (card.Keywords != null && card.Keywords.Count > 0)
+            {
+                var keywords = card.Keywords.ToList();
+                foreach (var keyword in card.Keywords)
+                {
+                    if (await context.CardKeywords.AnyAsync(k => k.Keyword.KeywordId.Equals(keyword.KeywordId) && k.Card.CardId.Equals(cardEntity.CardId)))
+                        keywords.Remove(keyword);
+                    else context.Keywords.Attach(await context.Keywords.FirstOrDefaultAsync(k => k.KeywordId.Equals(keyword.KeywordId)));
+                }
+                cardEntity.Keywords = keywords;
+            }
+
+            if (card.Colors != null && card.Colors.Count > 0)
+            {
+                var colors = card.Colors.ToList();
+                foreach (var color in card.Colors)
+                {
+                    if (await context.CardColors.AnyAsync(c => c.Color.ColorId.Equals(color.ColorId) && c.Card.CardId.Equals(cardEntity.CardId)))
+                        colors.Remove(color);
+                    else if (!context.Colors.Local.Any(c => c.ColorId.Equals(color.ColorId)))
+                        context.Colors.Attach(await context.Colors.FirstOrDefaultAsync(c => c.ColorId.Equals(color.ColorId)));
+                }
+                cardEntity.Colors = colors;
+            }
+
+            if (card.ProducedColors != null && card.ProducedColors.Count > 0)
+            {
+                var colors = card.ProducedColors.ToList();
+                foreach (var color in card.ProducedColors)
+                {
+                    if (await context.CardGenerateColors.AnyAsync(c => c.Color.ColorId.Equals(color.ColorId) && c.Card.CardId.Equals(cardEntity.CardId)))
+                        colors.Remove(color);
+                    else if (!context.Colors.Local.Any(c => c.ColorId.Equals(color.ColorId)))
+                        context.Colors.Attach(await context.Colors.FirstOrDefaultAsync(c => c.ColorId.Equals(color.ColorId)));
+                    //else context.Colors.Attach(color.Color);
+                }
+                cardEntity.ProducedColors = colors;
+            }
+            //var values = context.Entry(card).CurrentValues.Clone();
+            //values[nameof(Card.CardId)] = cardEntity.CardId;
+            //context.Entry(cardEntity).CurrentValues.SetValues(values);
+            if (cardEntity.CardId <= 0) context.Cards.Add(cardEntity);
+            await context.SaveChangesAsync();
+        }
+
+        public async Task AddCardsToSet(int setId, List<Card> cards)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var set = await context.Sets.Include(s => s.Cards).FirstOrDefaultAsync(s => s.SetId.Equals(setId));
+            set.Cards = cards;
+            await context.SaveChangesAsync();
+        }
+
         public async Task AddCardToDeck(int deckId, int cardId, int quantity, bool isSideboard)
         {
             using var context = await _contextFactory.CreateDbContextAsync();
@@ -310,9 +436,33 @@ namespace ScryfallDownloader.Services
         public async Task AddCardsToDeck(Deck deck, List<DeckCard> cards)
         {
             using var context = await _contextFactory.CreateDbContextAsync();
-
             context.Decks.Attach(deck);
             deck.Cards = cards;
+            await context.SaveChangesAsync();
+        }
+
+        public async Task AddCardsToDeck(Deck deck, List<(int, bool)> cards)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            context.Decks.Attach(deck);
+
+            List<DeckCard> deckCards = new();
+            foreach (var card in cards)
+            {
+                var exitingCard = deckCards.FirstOrDefault(c => c.CardId == card.Item1 && c.IsSideboard == card.Item2);
+                if (exitingCard != null) { exitingCard.Quantity++; }
+                else
+                {
+                    deckCards.Add(new DeckCard()
+                    {
+                        DeckId = deck.DeckId,
+                        CardId = card.Item1,
+                        Quantity = 1,
+                        IsSideboard = card.Item2
+                    });
+                }
+            }
+            deck.Cards = deckCards;
 
             await context.SaveChangesAsync();
         }
@@ -336,6 +486,48 @@ namespace ScryfallDownloader.Services
                 await context.SaveChangesAsync();
             }
             return card;
+        }
+
+        // Card Keywords
+
+        public async Task<Keyword> Create(Keyword keyword)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var entity = await context.Keywords.FirstOrDefaultAsync(k => k.Name == keyword.Name);
+            if (entity == null)
+            {
+                context.Keywords.Add(keyword);
+                await context.SaveChangesAsync();
+                return await context.Keywords.FirstOrDefaultAsync(k => k.Name == keyword.Name);
+            }
+            else return entity;
+        }
+
+        public async Task<Keyword?> GetKeyword(string name)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.Keywords.FirstOrDefaultAsync(k => k.Name == name);
+        }
+
+        // Card Colors
+
+        public async Task<Color> Create(Color color)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            var entity = await context.Colors.FirstOrDefaultAsync(c => c.Symbol == color.Symbol);
+            if (entity == null)
+            {
+                context.Colors.Add(color);
+                await context.SaveChangesAsync();
+                return await context.Colors.FirstOrDefaultAsync(c => c.Symbol == color.Symbol);
+            }
+            else return entity;
+        }
+
+        public async Task<Color?> GetColor(string symbol)
+        {
+            using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.Colors.FirstOrDefaultAsync(c => c.Symbol == symbol);
         }
 
         // Edhrec Commanders
@@ -389,13 +581,17 @@ namespace ScryfallDownloader.Services
                 var setting = await context.Settings.AddAsync(new Setting());
                 return setting.Entity;
             }
-            else return await context.Settings.FirstAsync();
+            else return await context.Settings.AsNoTracking().OrderBy(s => s.SettingId).FirstAsync();
         }
 
         public async Task SaveSettings(Setting setting)
         {
             using var context = await _contextFactory.CreateDbContextAsync();
-            context.Settings.Attach(setting);
+            var settings = await context.Settings.OrderBy(s => s.SettingId).FirstAsync();
+            var values = context.Entry(setting).CurrentValues.Clone();
+            values[nameof(Setting.SettingId)] = settings.SettingId;
+            context.Entry(settings).CurrentValues.SetValues(values);
+            context.Entry(settings).State = EntityState.Modified;
             await context.SaveChangesAsync();
         }
     }

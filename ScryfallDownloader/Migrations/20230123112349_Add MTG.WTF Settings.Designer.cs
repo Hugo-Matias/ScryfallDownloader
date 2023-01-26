@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ScryfallDownloader.Services;
 
@@ -10,9 +11,11 @@ using ScryfallDownloader.Services;
 namespace ScryfallDownloader.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    partial class DownloaderContextModelSnapshot : ModelSnapshot
+    [Migration("20230123112349_Add MTG.WTF Settings")]
+    partial class AddMTGWTFSettings
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "7.0.2");
@@ -65,39 +68,11 @@ namespace ScryfallDownloader.Migrations
                     b.Property<string>("CollectorsNumber")
                         .HasColumnType("TEXT");
 
-                    b.Property<decimal>("ConvertedManaCost")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("HandModifier")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ImageUrl")
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("IsHighres")
-                        .HasColumnType("INTEGER");
-
                     b.Property<bool>("IsImplemented")
                         .HasColumnType("INTEGER");
 
-                    b.Property<string>("Layout")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("LifeModifier")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Loyalty")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ManaCost")
-                        .HasColumnType("TEXT");
-
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Power")
                         .HasColumnType("TEXT");
 
                     b.Property<int?>("RarityId")
@@ -105,13 +80,6 @@ namespace ScryfallDownloader.Migrations
 
                     b.Property<int>("SetId")
                         .HasColumnType("INTEGER");
-
-                    b.Property<string>("Toughness")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
 
                     b.HasKey("CardId");
 
@@ -121,77 +89,7 @@ namespace ScryfallDownloader.Migrations
 
                     b.HasIndex("SetId");
 
-                    b.HasIndex("Name", "SetId", "CollectorsNumber")
-                        .IsUnique();
-
                     b.ToTable("Cards");
-                });
-
-            modelBuilder.Entity("ScryfallDownloader.Data.CardColor", b =>
-                {
-                    b.Property<int>("CardId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("ColorId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("CardId", "ColorId");
-
-                    b.HasIndex("ColorId");
-
-                    b.ToTable("CardColors");
-                });
-
-            modelBuilder.Entity("ScryfallDownloader.Data.CardGenerateColor", b =>
-                {
-                    b.Property<int>("CardId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("ColorId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("CardId", "ColorId");
-
-                    b.HasIndex("ColorId");
-
-                    b.ToTable("CardGenerateColors");
-                });
-
-            modelBuilder.Entity("ScryfallDownloader.Data.CardKeyword", b =>
-                {
-                    b.Property<int>("CardId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("KeywordId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("CardId", "KeywordId");
-
-                    b.HasIndex("KeywordId");
-
-                    b.ToTable("CardKeywords");
-                });
-
-            modelBuilder.Entity("ScryfallDownloader.Data.Color", b =>
-                {
-                    b.Property<int>("ColorId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Symbol")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("ColorId");
-
-                    b.HasIndex("Name")
-                        .IsUnique();
-
-                    b.ToTable("Colors");
                 });
 
             modelBuilder.Entity("ScryfallDownloader.Data.Deck", b =>
@@ -319,24 +217,6 @@ namespace ScryfallDownloader.Migrations
                     b.ToTable("Formats");
                 });
 
-            modelBuilder.Entity("ScryfallDownloader.Data.Keyword", b =>
-                {
-                    b.Property<int>("KeywordId")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("KeywordId");
-
-                    b.HasIndex("Name")
-                        .IsUnique();
-
-                    b.ToTable("Keywords");
-                });
-
             modelBuilder.Entity("ScryfallDownloader.Data.Rarity", b =>
                 {
                     b.Property<int>("RarityId")
@@ -383,9 +263,6 @@ namespace ScryfallDownloader.Migrations
 
                     b.HasKey("SetId");
 
-                    b.HasIndex("Code")
-                        .IsUnique();
-
                     b.HasIndex("SetTypeId");
 
                     b.ToTable("Sets");
@@ -420,9 +297,6 @@ namespace ScryfallDownloader.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<int>("EDHDeck")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("ImportSet")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("MT8Page")
@@ -521,63 +395,6 @@ namespace ScryfallDownloader.Migrations
                     b.Navigation("Set");
                 });
 
-            modelBuilder.Entity("ScryfallDownloader.Data.CardColor", b =>
-                {
-                    b.HasOne("ScryfallDownloader.Data.Card", "Card")
-                        .WithMany("Colors")
-                        .HasForeignKey("CardId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("ScryfallDownloader.Data.Color", "Color")
-                        .WithMany()
-                        .HasForeignKey("ColorId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Card");
-
-                    b.Navigation("Color");
-                });
-
-            modelBuilder.Entity("ScryfallDownloader.Data.CardGenerateColor", b =>
-                {
-                    b.HasOne("ScryfallDownloader.Data.Card", "Card")
-                        .WithMany("ProducedColors")
-                        .HasForeignKey("CardId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("ScryfallDownloader.Data.Color", "Color")
-                        .WithMany()
-                        .HasForeignKey("ColorId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Card");
-
-                    b.Navigation("Color");
-                });
-
-            modelBuilder.Entity("ScryfallDownloader.Data.CardKeyword", b =>
-                {
-                    b.HasOne("ScryfallDownloader.Data.Card", "Card")
-                        .WithMany("Keywords")
-                        .HasForeignKey("CardId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("ScryfallDownloader.Data.Keyword", "Keyword")
-                        .WithMany()
-                        .HasForeignKey("KeywordId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Card");
-
-                    b.Navigation("Keyword");
-                });
-
             modelBuilder.Entity("ScryfallDownloader.Data.Deck", b =>
                 {
                     b.HasOne("ScryfallDownloader.Data.Author", "Author")
@@ -654,13 +471,7 @@ namespace ScryfallDownloader.Migrations
 
             modelBuilder.Entity("ScryfallDownloader.Data.Card", b =>
                 {
-                    b.Navigation("Colors");
-
                     b.Navigation("Decks");
-
-                    b.Navigation("Keywords");
-
-                    b.Navigation("ProducedColors");
                 });
 
             modelBuilder.Entity("ScryfallDownloader.Data.Deck", b =>

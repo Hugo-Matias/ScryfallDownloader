@@ -1,7 +1,9 @@
 ﻿@page "/"
 @using System.Text.RegularExpressions;
 @inject DataService DB
-@inject EdhrecDownloaderService EDH
+@inject IOService IO
+@inject DownloaderRepository Downloader
+@inject DeckGeneratorService Generator
 
 <PageTitle>Deck Builder</PageTitle>
 
@@ -16,10 +18,10 @@
         @if (_deckCards.Count > 0)
         {
             <ul class="list-group">
-            @foreach(var card in _deckCards)
-            {
-               <li class="list-group-item" >@card.Quantity - @card.Name | @card.Set@(!string.IsNullOrWhiteSpace(card.CollectorNumber) ? $" | {card.CollectorNumber}" : "")</li>
-            }
+                @foreach (var card in _deckCards)
+                {
+                    <li class="list-group-item">@card.Quantity - @card.Name | @card.Set@(!string.IsNullOrWhiteSpace(card.CollectorNumber) ? $" | {card.CollectorNumber}" : "")</li>
+                }
             </ul>
         }
     </div>
@@ -48,9 +50,12 @@
 
     private async Task TEST()
     {
+        await App.InitializeDatabase(false);
         //var set = DB.GetSet("lea", true);
         //var deck = await DB.GetDeck("DECK 2");
-        await EDH.Download();
+        //await Downloader.MtgWtfDownload();
+        //var deck = await Generator.GenerateDeck(47496);
+        //if (!string.IsNullOrWhiteSpace(deck)) await IO.SaveTextFile("test.dck", deck);
     }
 
     private async Task InitializeDatabase()
@@ -96,7 +101,7 @@
                 var variation = 1;
                 for (int i = 0; i < card.Quantity; i++)
                 {
-                    tempDecklist.Add(new DeckCardModel() {  } );
+                    tempDecklist.Add(new DeckCardModel() { });
                 }
             }
         }
@@ -111,7 +116,7 @@
             var parsedName = card.Name.ToLower().ParseCardname();
             var cardSets = App.ForgeData.Editions.Where(s => s.Cards.Any(c => c.Name.ToLower().Contains(parsedName)) && s.Date < _beforeReleaseDate).OrderByDescending(s => s.Date);
 
-            if(string.IsNullOrWhiteSpace(card.Set)) card.Set = cardSets.ElementAt(0).Code.ToLower();
+            if (string.IsNullOrWhiteSpace(card.Set)) card.Set = cardSets.ElementAt(0).Code.ToLower();
             card.Variations = App.ForgeData.Editions.First(s => s.Code.ToLower() == card.Set).Cards.Count(c => c.Name.ToLower().Contains(parsedName));
 
 

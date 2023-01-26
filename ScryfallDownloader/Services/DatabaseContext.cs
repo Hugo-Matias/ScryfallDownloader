@@ -23,6 +23,11 @@ namespace ScryfallDownloader.Services
         public DbSet<Format> Formats { get; set; }
         public DbSet<EdhrecCommander> EdhrecCommanders { get; set; }
         public DbSet<Setting> Settings { get; set; }
+        public DbSet<Keyword> Keywords { get; set; }
+        public DbSet<CardKeyword> CardKeywords { get; set; }
+        public DbSet<Color> Colors { get; set; }
+        public DbSet<CardColor> CardColors { get; set; }
+        public DbSet<CardGenerateColor> CardGenerateColors { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -41,15 +46,22 @@ namespace ScryfallDownloader.Services
 
             modelBuilder.Entity<Deck>().Property(nameof(Deck.MissingCards)).HasConversion(splitStringConverter, splitStringComparer);
 
-            modelBuilder.Entity<DeckCard>().HasKey(dc => new { dc.DeckId, dc.CardId, dc.IsSideboard });
+            modelBuilder.Entity<DeckCard>().HasKey(e => new { e.DeckId, e.CardId, e.IsSideboard });
+            modelBuilder.Entity<CardColor>().HasKey(e => new { e.CardId, e.ColorId });
+            modelBuilder.Entity<CardGenerateColor>().HasKey(e => new { e.CardId, e.ColorId });
+            modelBuilder.Entity<CardKeyword>().HasKey(e => new { e.CardId, e.KeywordId });
 
-            modelBuilder.Entity<Rarity>().HasIndex(r => r.Name).IsUnique();
-            modelBuilder.Entity<Artist>().HasIndex(a => a.Name).IsUnique();
-            modelBuilder.Entity<Tag>().HasIndex(t => t.Name).IsUnique();
-            modelBuilder.Entity<Author>().HasIndex(a => a.Name).IsUnique();
-            modelBuilder.Entity<Source>().HasIndex(s => s.Name).IsUnique();
-            modelBuilder.Entity<Format>().HasIndex(f => f.Name).IsUnique();
-            modelBuilder.Entity<EdhrecCommander>().HasIndex(c => c.Name).IsUnique();
+            modelBuilder.Entity<Card>().HasIndex(nameof(Card.Name), nameof(Card.Set.SetId), nameof(Card.CollectorsNumber)).IsUnique();
+            modelBuilder.Entity<Rarity>().HasIndex(e => e.Name).IsUnique();
+            modelBuilder.Entity<Artist>().HasIndex(e => e.Name).IsUnique();
+            modelBuilder.Entity<Tag>().HasIndex(e => e.Name).IsUnique();
+            modelBuilder.Entity<Author>().HasIndex(e => e.Name).IsUnique();
+            modelBuilder.Entity<Source>().HasIndex(e => e.Name).IsUnique();
+            modelBuilder.Entity<Format>().HasIndex(e => e.Name).IsUnique();
+            modelBuilder.Entity<EdhrecCommander>().HasIndex(e => e.Name).IsUnique();
+            modelBuilder.Entity<Keyword>().HasIndex(e => e.Name).IsUnique();
+            modelBuilder.Entity<Color>().HasIndex(e => e.Name).IsUnique();
+            modelBuilder.Entity<Set>().HasIndex(e => e.Code).IsUnique();
         }
     }
 }

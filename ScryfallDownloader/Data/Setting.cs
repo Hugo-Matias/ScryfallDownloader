@@ -10,5 +10,8 @@
         public int SCGPage { get; set; } = 816;
         public string EDHCommander { get; set; } = "atraxa-praetors-voice";
         public int EDHDeck { get; set; } = 3592;
+        public int ARCHPage { get; set; } = 1;
+        public string WTFDeck { get; set; }
+        public int ImportSet { get; set; } = 609;
     }
 }

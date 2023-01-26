@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ScryfallDownloader.Services;
 
@@ -10,9 +11,11 @@ using ScryfallDownloader.Services;
 namespace ScryfallDownloader.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    partial class DownloaderContextModelSnapshot : ModelSnapshot
+    [Migration("20230123210544_Expand Card properties")]
+    partial class ExpandCardproperties
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "7.0.2");
@@ -65,13 +68,14 @@ namespace ScryfallDownloader.Migrations
                     b.Property<string>("CollectorsNumber")
                         .HasColumnType("TEXT");
 
-                    b.Property<decimal>("ConvertedManaCost")
-                        .HasColumnType("TEXT");
+                    b.Property<int>("ConvertedManaCost")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("HandModifier")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("ImageUrl")
+                        .IsRequired()
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsHighres")
@@ -121,9 +125,6 @@ namespace ScryfallDownloader.Migrations
 
                     b.HasIndex("SetId");
 
-                    b.HasIndex("Name", "SetId", "CollectorsNumber")
-                        .IsUnique();
-
                     b.ToTable("Cards");
                 });
 
@@ -133,6 +134,9 @@ namespace ScryfallDownloader.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("ColorId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("CardColorId")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("CardId", "ColorId");
@@ -150,6 +154,9 @@ namespace ScryfallDownloader.Migrations
                     b.Property<int>("ColorId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("CardGenerateColorId")
+                        .HasColumnType("INTEGER");
+
                     b.HasKey("CardId", "ColorId");
 
                     b.HasIndex("ColorId");
@@ -163,6 +170,9 @@ namespace ScryfallDownloader.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("KeywordId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("CardKeywordId")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("CardId", "KeywordId");
@@ -383,9 +393,6 @@ namespace ScryfallDownloader.Migrations
 
                     b.HasKey("SetId");
 
-                    b.HasIndex("Code")
-                        .IsUnique();
-
                     b.HasIndex("SetTypeId");
 
                     b.ToTable("Sets");
@@ -420,9 +427,6 @@ namespace ScryfallDownloader.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<int>("EDHDeck")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("ImportSet")
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("MT8Page")

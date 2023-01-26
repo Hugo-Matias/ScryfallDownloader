@@ -191,17 +191,28 @@
         return cardName.ParseCardname(true);
     }
 
-    public async Task InitializeDatabase()
+    public async Task InitializeDatabase(bool redownloadData = false)
     {
+        var settings = await DB.LoadSettings();
+        if (Forge.Cards == null || Forge.Cards.Count == 0) await Forge.GetCardsData(redownloadData);
+
         var setIndex = 0;
         foreach (var set in AllSets.OrderBy(s => s.ReleaseDate).ToList())
         {
             setIndex++;
+            if (setIndex < settings.ImportSet) continue;
             Console.WriteLine($"\n\nCreating Set {setIndex}/{AllSets.Count}: {set.Code.ToUpper()} | {set.Name}\n");
 
-            if (await DB.GetSet(set.Code) != null) continue;
+            var setEntity = await DB.GetSet(set.Code);
+            if (setEntity != null)
+            {
+                await CreateSetCards(setEntity, setIndex);
+                settings.ImportSet = setIndex;
+                await DB.SaveSettings(settings);
+                continue;
+            }
 
-            var setEntity = new Data.Set();
+            setEntity = new Data.Set();
 
             setEntity.Name = set.Name;
             setEntity.Code = set.Code;
@@ -216,34 +227,81 @@
             else setEntity.SetType = setType;
 
             var createdSetEntity = await DB.Create(setEntity);
+            await CreateSetCards(createdSetEntity, setIndex);
 
-            if (Forge.Cards.Count > 0)
+            settings.ImportSet = setIndex;
+            await DB.SaveSettings(settings);
+        }
+    }
+
+    private async Task CreateSetCards(Data.Set set, int setIndex)
+    {
+        var setCards = Forge.Cards.Where(c => c.Set == set.Code);
+        var cardTotal = setCards.Count();
+        var cardIndex = 0;
+        List<Data.Card> cards = new();
+        foreach (var setCard in setCards)
+        {
+            cardIndex++;
+            Console.WriteLine($"{setIndex}||{cardIndex}/{cardTotal}: {setCard.Name}");
+
+            var card = new Data.Card();
+
+            card.Name = setCard.Name;
+            card.SetId = set.SetId;
+            card.CollectorsNumber = setCard.CollectorNumber;
+            card.Rarity = new Rarity() { Name = setCard.Rarity, Symbol = setCard.Rarity.ToUpper()[0] };
+            card.Artist = new Artist() { Name = setCard.Artist };
+            card.Layout = setCard.Layout;
+            card.ConvertedManaCost = setCard.Cmc;
+            card.IsHighres = setCard.HighresImage;
+            if (setCard.CardFaces == null || setCard.CardFaces.Length == 0 || setCard.Layout.ToLower() == "flip")
+                card.ImageUrl = setCard.HighresImage ? setCard.ImageUris["png"] : setCard.ImageUris["normal"];
+            if (setCard.CardFaces != null && setCard.CardFaces.Length > 0) card.Type = $"{setCard.CardFaces[0].TypeLine}{(setCard.CardFaces[0].TypeLine != setCard.CardFaces[1].TypeLine ? $" | {setCard.CardFaces[1].TypeLine}" : "")}";
+            else card.Type = setCard.TypeLine;
+            card.ManaCost ??= setCard.ManaCost;
+            card.Power ??= setCard.Power;
+            card.Toughness ??= setCard.Toughness;
+            card.Loyalty ??= setCard.Loyalty;
+            card.LifeModifier ??= setCard.LifeModifier;
+            card.HandModifier ??= setCard.HandModifier;
+            card.IsImplemented = CheckForgeImplementation(setCard.Name);
+
+            if (setCard.Keywords != null)
             {
-                var setCards = Forge.Cards.Where(c => c.Set == set.Code);
-                var cardTotal = setCards.Count();
-                var cardIndex = 0;
-                foreach (var card in setCards)
+                card.Keywords = new List<CardKeyword>();
+                foreach (var setCardKeyword in setCard.Keywords)
                 {
-                    cardIndex++;
-                    Console.WriteLine($"{setIndex}||{cardIndex}/{cardTotal}: {card.Name}");
-
-                    var cardEntity = new Data.Card();
-
-                    cardEntity.Name = card.Name;
-                    cardEntity.CollectorsNumber = card.CollectorNumber;
-
-                    if (!string.IsNullOrWhiteSpace(card.Rarity))
-                        cardEntity.Rarity = new Rarity() { Name = card.Rarity, Symbol = card.Rarity.ToUpper()[0] };
-
-                    cardEntity.Artist = new Artist() { Name = card.Artist };
-                    cardEntity.Set = createdSetEntity;
-                    cardEntity.IsImplemented = CheckForgeImplementation(card.Name);
-
-                    var createdCardEntity = await DB.Create(cardEntity);
-                    await DB.AddCardToSet(createdSetEntity.SetId, createdCardEntity.CardId);
+                    var keyword = await DB.Create(new Keyword() { Name = setCardKeyword });
+                    card.Keywords.Add(new CardKeyword() { Card = card, KeywordId = keyword.KeywordId });
                 }
             }
+
+            if (setCard.Colors != null)
+            {
+                card.Colors = new List<CardColor>();
+                foreach (var setCardColor in setCard.Colors)
+                {
+                    var color = await DB.Create(new Color() { Symbol = setCardColor, Name = setCardColor.ParseColorName() });
+                    card.Colors.Add(new CardColor() { Card = card, ColorId = color.ColorId });
+                }
+            }
+
+            if (setCard.ProducedMana != null)
+            {
+                card.ProducedColors = new List<CardGenerateColor>();
+                foreach (var mana in setCard.ProducedMana)
+                {
+                    var color = await DB.Create(new Color() { Symbol = mana, Name = mana.ParseColorName() });
+                    card.ProducedColors.Add(new CardGenerateColor() { Card = card, ColorId = color.ColorId });
+                }
+            }
+
+            //cards.Add(card);
+            //var createdCardEntity = await DB.Create(cardEntity);
+            await DB.AddCardToSet(set.SetId, card);
         }
+        //await DB.AddCardsToSet(set.SetId, cards);
     }
 
     private bool CheckForgeImplementation(string cardName)

@@ -8,6 +8,7 @@ namespace ScryfallDownloader.Services
     {
         private readonly HttpClient _httpClient;
         private readonly DataService _db;
+        private DateTime _startTime;
 
         public EdhrecDownloaderService(HttpClient httpClient, DataService db)
         {
@@ -18,6 +19,7 @@ namespace ScryfallDownloader.Services
 
         public async Task Download()
         {
+            _startTime = DateTime.Now;
             if (!await _db.CheckEdhrecCommandersPopulated())
             {
                 var commanders = await GetCommanders();
@@ -25,7 +27,14 @@ namespace ScryfallDownloader.Services
             }
 
             var commanderEntities = await _db.GetEdhrecCommanders();
-            foreach (var entity in commanderEntities) { await CreateDecks(entity.Link); }
+            foreach (var entity in commanderEntities)
+            {
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.WriteLine(entity.Name);
+                Console.ResetColor();
+
+                await CreateDecks(entity.Link);
+            }
         }
 
         private async Task<List<EdhrecCommander>> GetCommanders()
@@ -92,8 +101,9 @@ namespace ScryfallDownloader.Services
 
                 if (await _db.CheckDeckExists(name, "EDHREC", "EDHREC", date)) continue;
 
+                var elapsedTime = DateTime.Now - _startTime;
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine($"{deckIndex}/{deckHashes.Count}: {hash}");
+                Console.WriteLine($"{elapsedTime:h'h 'm'm 's's'} | {deckIndex}/{deckHashes.Count}: {hash}");
                 Console.ResetColor();
 
                 Deck deck = new()
@@ -114,20 +124,17 @@ namespace ScryfallDownloader.Services
 
                 if (json["commanders"] != null)
                 {
-                    Console.ForegroundColor = ConsoleColor.Cyan;
-                    Console.WriteLine(json["commanders"][0]);
                     var commanderEntity = await _db.GetLatestCard(json["commanders"][0].ToString(), DateOnly.FromDateTime(createdDeck.CreateDate));
 
                     if (json["commanders"]!.AsArray().Count > 1)
                     {
-                        Console.WriteLine(json["commanders"][1]);
                         var commander2Entity = await _db.GetLatestCard(json["commanders"][1].ToString(), DateOnly.FromDateTime(createdDeck.CreateDate));
                         await _db.AddCommandersToDeck(createdDeck.DeckId, commanderEntity.CardId, commander2Entity.CardId);
                     }
                     else await _db.AddCommandersToDeck(createdDeck.DeckId, commanderEntity.CardId);
-                    Console.ResetColor();
                 }
 
+                //List<(int, bool)> cards = new();
                 List<DeckCard> cards = new();
                 List<string> missingCards = null;
                 foreach (var card in json["cards"].AsArray())
@@ -136,6 +143,7 @@ namespace ScryfallDownloader.Services
                     var cardEntity = await _db.GetLatestCard(card.ToString(), DateOnly.FromDateTime(deck.CreateDate), false);
                     if (cardEntity != null)
                     {
+                        //cards.Add((cardEntity.CardId, false));
                         if (cards.Any(c => c.CardId.Equals(cardEntity.CardId)))
                         {
                             var deckCard = cards.FirstOrDefault(c => c.CardId.Equals(cardEntity.CardId));
@@ -145,16 +153,14 @@ namespace ScryfallDownloader.Services
                         {
                             cards.Add(new DeckCard()
                             {
-                                Deck = createdDeck,
                                 DeckId = createdDeck.DeckId,
-                                Card = cardEntity,
                                 CardId = cardEntity.CardId,
                                 Quantity = 1,
                                 IsSideboard = false
                             });
                         }
                         //await _db.AddCardToDeck(createdDeck.DeckId, cardEntity.CardId, 1, false);
-                        Console.WriteLine($"{deckIndex}||{card}");
+                        //Console.WriteLine($"{deckIndex}||{card}");
                     }
                     else
                     {
@@ -166,7 +172,8 @@ namespace ScryfallDownloader.Services
                     }
                 }
                 if (missingCards != null && missingCards.Count > 0) { await _db.UpdateDeckMissingCards(createdDeck.DeckId, missingCards); }
-                settings.EDHDeck++;
+                await _db.AddCardsToDeck(createdDeck, cards);
+                settings.EDHDeck = deckIndex;
                 await _db.SaveSettings(settings);
             }
             settings.EDHCommander = commander;

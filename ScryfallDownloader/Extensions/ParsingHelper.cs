@@ -97,5 +97,30 @@ namespace ScryfallDownloader.Extensions
 
             return format;
         }
+
+        public static string ParseColorName(this string symbol)
+        {
+            symbol = symbol.Trim().ToLower();
+
+            switch (symbol)
+            {
+                case "w":
+                    return "White";
+                case "u":
+                    return "Blue";
+                case "b":
+                    return "Black";
+                case "r":
+                    return "Red";
+                case "g":
+                    return "Green";
+                case "c":
+                    return "Colorless";
+                case "t":
+                    return "Tap";
+                default:
+                    return symbol.ToUpper();
+            }
+        }
     }
 }
