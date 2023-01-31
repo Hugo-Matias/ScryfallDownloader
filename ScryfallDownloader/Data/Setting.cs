@@ -14,5 +14,7 @@
         public string WTFDeck { get; set; } = "";
         public int ImportSet { get; set; } = 609;
         public ICollection<string> MissingCardDecks { get; set; } = new List<string>();
+
+        public int MOXPage { get; set; } = 1;
     }
 }

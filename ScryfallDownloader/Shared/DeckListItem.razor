@@ -1,0 +1,33 @@
+﻿<li class="list-group-item">@_quantity - @_name | @_setCode@(_forgeCode != null && !_forgeCode.Equals(_setCode) ? $"/{_forgeCode}" : "")<i class="ms-1 @ParseSetCodeClass()" />@(!string.IsNullOrWhiteSpace(_cn) ? $" | {_cn}" : "")</li>
+
+@code {
+    [Parameter]
+    public Data.DeckCard Card { get; set; }
+
+    private int _quantity;
+    private string _name;
+    private string _setCode;
+    private string _forgeCode;
+    private string _cn;
+
+    protected override void OnParametersSet()
+    {
+        _quantity = Card.Quantity;
+        _name = Card.Card.Name;
+        _setCode = Card.Card.Set.Code.ToUpper();
+        _forgeCode = Card.Card.Set.ForgeCode.ToUpper();
+        _cn = Card.Card.CollectorsNumber;
+    }
+
+    private string ParseSetCodeClass()
+    {
+        var rarity = Card.Card.Rarity.Symbol switch
+        {
+            'U' => "uncommon",
+            'R' => "rare",
+            'M' => "mythic",
+            _ => "common"
+        };
+        return $"ss ss-fw ss-2x ss-grad ss-{rarity} ss-{Card.Card.Set.Code.ToLower()}";
+    }
+}

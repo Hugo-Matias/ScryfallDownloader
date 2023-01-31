@@ -24,21 +24,21 @@ namespace ScryfallDownloader.Services
 
         public async Task Download()
         {
+            var _startTime = DateTime.Now;
             var settings = await _db.LoadSettings();
-            do
+            while (true)
             {
                 var decks = await GetDecks(settings.MT8Page);
                 if (decks == null) break;
 
                 Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine($"=========================================================Page: {settings.MT8Page}");
+                Console.WriteLine($"\n:::Elapsed Time: {DateTime.Now - _startTime:h'h 'm'm 's's'} | Page: {settings.MT8Page}\n");
                 Console.ResetColor();
                 await _db.CreateDeckEntities(decks, "MTGTop8", "https://mtgtop8.com/");
 
                 settings.MT8Page++;
                 await _db.SaveSettings(settings);
-            } while (true);
-
+            }
             Console.WriteLine("\n\nDeck Scraping Has Finished!");
         }
 
@@ -78,8 +78,12 @@ namespace ScryfallDownloader.Services
                 var rank = cols[6].InnerText;
                 var date = DateTime.ParseExact(cols[7].InnerText, "dd/MM/yy", CultureInfo.InvariantCulture);
 
-                var deck = new BaseDeckModel() { Name = name, Link = linkUri, Player = author, Event = gameEvent, Format = format, Date = date };
-                deck.Description = $"Deck Code: {deckCode}\nEvent Code: {eventCode}\nRank: {rank}\nEvent: {gameEvent}";
+                // Preemptive termination for existing decks,
+                // we would need to download cardlist and reach DataService.CreateDeckEntities() to exclude existing deck
+                if (await _db.CheckDeckExists(name, author, "MTGTop8", date)) continue;
+
+                var deck = new BaseDeckModel() { Name = name, Link = linkUri, Author = author, Event = gameEvent, Format = format, Date = date };
+                deck.Description = $"Deck Code: {deckCode}\nEvent Code: {eventCode}\nRank: {rank}";
                 deck.Cards = await GetCards(deckCode);
 
                 decks.Add(deck);

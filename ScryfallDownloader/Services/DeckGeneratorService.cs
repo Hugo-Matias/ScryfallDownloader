@@ -1,5 +1,6 @@
 ﻿using ScryfallDownloader.Data;
 using ScryfallDownloader.Extensions;
+using System.Text.RegularExpressions;
 
 namespace ScryfallDownloader.Services
 {
@@ -12,7 +13,68 @@ namespace ScryfallDownloader.Services
         {
             _db = db;
         }
+        public async Task<List<DeckCard>?> ParseImportLines(string importText, DateOnly setDate, bool isMainOnly)
+        {
+            if (string.IsNullOrWhiteSpace(importText)) return null;
+            var section = "mainboard";
+            Regex separators = new Regex(@"[\[\](|)]", RegexOptions.Compiled);
 
+            List<DeckCard> cards = new();
+
+            foreach (var line in importText.Split("\n"))
+            {
+                if (string.IsNullOrWhiteSpace(line)) continue;
+
+                var compOpt = StringComparison.InvariantCultureIgnoreCase;
+                if (line.StartsWith("sideboard", compOpt)) { section = "sideboard"; continue; }
+                if (line.StartsWith("commander", compOpt)) { section = "commander"; continue; }
+
+
+                if (!separators.IsMatch(line))
+                {
+
+                    int quantity;
+                    string name;
+                    if (line.StartsWith("sb:", compOpt) || line.StartsWith("cm:", compOpt))
+                    {
+                        var groups = line.Split(' ', 3, StringSplitOptions.RemoveEmptyEntries);
+                        section = groups[0].ToLower() switch
+                        {
+                            "sb:" => "sideboard",
+                            "cm:" => "commander",
+                            _ => "mainboard",
+                        };
+                        quantity = groups[1].ParseToInt();
+                        if (quantity == int.MinValue) { Console.WriteLine($"Couldn't parse deck line: {line}"); continue; }
+                        name = groups[2];
+                        cards.Add(await GenerateDeckCard(quantity, name, section == "sideboard", setDate, isMainOnly));
+                    }
+                    else
+                    {
+                        var groups = line.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+                        quantity = groups[0].ParseToInt();
+                        if (quantity == int.MinValue) { Console.WriteLine($"Couldn't parse deck line: {line}"); continue; }
+                        name = groups[1];
+                        cards.Add(await GenerateDeckCard(quantity, name, section == "sideboard", setDate, isMainOnly));
+                    }
+                }
+            }
+            return cards;
+        }
+
+        private async Task<DeckCard?> GenerateDeckCard(int quantity, string name, bool isSideboard, DateOnly setDate, bool isMainOnly, string? set = null)
+        {
+            var cardEntity = string.IsNullOrWhiteSpace(set) ? await _db.GetLatestCard(name, setDate, isMainOnly) : await _db.GetCard(name, set);
+            if (cardEntity == null) return null;
+
+            return new DeckCard() { CardId = cardEntity.CardId, Card = cardEntity, IsSideboard = isSideboard, Quantity = quantity };
+        }
+
+        /// <summary>
+        /// Generate deck text in Forge's scheme, including sections like [Metadata], [Mainboard], etc.
+        /// </summary>
+        /// <param name="deckId"></param>
+        /// <returns>Tuple (string, string):<br/> Item1 is the deck's name.<br /> Item2 is the generated string with cards and other info.</returns>
         public async Task<(string, string)> GenerateDeck(int deckId)
         {
             var settings = await _db.LoadSettings();
@@ -90,42 +152,6 @@ namespace ScryfallDownloader.Services
             return (deck.Name, await GenerateDeckString(deck.Name, mainCards, sideCards, specialCards, commander));
         }
 
-        private async Task<List<string>?> GenerateCardList(List<DeckCard> cards)
-        {
-            List<string> cardlist = new();
-
-
-            var setIds = cards.Select(c => c.Card.Set.SetId).Distinct().ToList();
-            List<Set> sets = new();
-            foreach (var set in setIds)
-            {
-                sets.Add(await _db.GetSet(set, true));
-            }
-
-            foreach (var card in cards)
-            {
-                if (card.Card.Set == null || card.Card.Set.ForgeCode == null) return null;
-
-                var cardName = card.Card.Name;
-                if (cardName.Contains(" // ") && card.Card.Layout.Name != "split") cardName = cardName.ParseSplitCardname();
-
-                if (card.Quantity == 1) { cardlist.Add($"1 {cardName}|{card.Card.Set.ForgeCode.ToUpper()}"); continue; }
-
-                var setCards = sets.FirstOrDefault(s => s.SetId == card.Card.Set.SetId).Cards.Where(c => c.Name == card.Card.Name).ToList();
-                if (setCards.Count == 1) { cardlist.Add($"{card.Quantity} {cardName}|{card.Card.Set.ForgeCode.ToUpper()}"); continue; }
-
-                var variations = CalculateVariations(card.Quantity, setCards.Count);
-
-                for (var i = 1; i <= variations.Count; i++)
-                {
-                    if (variations[i - 1] == 0) break;
-                    cardlist.Add($"{variations[i - 1]} {cardName}|{card.Card.Set.ForgeCode.ToUpper()}|{i}");
-                }
-            }
-
-            return cardlist;
-        }
-
         private async Task<string> GenerateDeckString(string deckName, List<DeckCard> mainCards, List<DeckCard>? sideCards = null, List<DeckCard>? specialCards = null, Card? commander = null)
         {
             var deckString = string.Empty;
@@ -164,6 +190,42 @@ namespace ScryfallDownloader.Services
             }
 
             return deckString;
+        }
+
+        private async Task<List<string>?> GenerateCardList(List<DeckCard> cards)
+        {
+            List<string> cardlist = new();
+
+
+            var setIds = cards.Select(c => c.Card.Set.SetId).Distinct().ToList();
+            List<Set> sets = new();
+            foreach (var set in setIds)
+            {
+                sets.Add(await _db.GetSet(set, true));
+            }
+
+            foreach (var card in cards)
+            {
+                if (card.Card.Set == null || card.Card.Set.ForgeCode == null) return null;
+
+                var cardName = card.Card.Name.RemoveDiacritics();
+                if (cardName.Contains(" // ") && card.Card.Layout.Name != "split") cardName = cardName.ParseSplitCardname();
+
+                if (card.Quantity == 1) { cardlist.Add($"1 {cardName}|{card.Card.Set.ForgeCode.ToUpper()}"); continue; }
+
+                var setCards = sets.FirstOrDefault(s => s.SetId == card.Card.Set.SetId).Cards.Where(c => c.Name == card.Card.Name).ToList();
+                if (setCards.Count == 1) { cardlist.Add($"{card.Quantity} {cardName}|{card.Card.Set.ForgeCode.ToUpper()}"); continue; }
+
+                var variations = CalculateVariations(card.Quantity, setCards.Count);
+
+                for (var i = 1; i <= variations.Count; i++)
+                {
+                    if (variations[i - 1] == 0) break;
+                    cardlist.Add($"{variations[i - 1]} {cardName}|{card.Card.Set.ForgeCode.ToUpper()}|{i}");
+                }
+            }
+
+            return cardlist;
         }
 
         private List<int> CalculateVariations(int quantity, int variations)

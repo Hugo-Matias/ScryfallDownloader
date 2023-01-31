@@ -94,7 +94,7 @@ namespace ScryfallDownloader.Services
                 if (string.IsNullOrWhiteSpace(decklistString)) { Console.WriteLine($"EMPTY DECKLIST: {name} - {link.AbsolutePath}"); continue; }
                 var deck = ParseDecklist(decklistString);
 
-                decks.Add(new BaseDeckModel() { Name = name, Link = link, Description = description, Finish = finish, Player = player, Event = eventName, Format = format, Date = date, Location = location, Cards = deck });
+                decks.Add(new BaseDeckModel() { Name = name, Link = link, Description = description, Finish = finish, Author = player, Event = eventName, Format = format, Date = date, Location = location, Cards = deck });
             }
 
             return (nextPageLink, decks);

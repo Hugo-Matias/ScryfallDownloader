@@ -1,5 +1,6 @@
 ﻿@page "/"
 @using System.Text.RegularExpressions;
+@using System.Globalization;
 @inject DataService DB
 @inject IOService IO
 @inject DownloaderRepository Downloader
@@ -10,17 +11,57 @@
 <h3>Deck Builder</h3>
 <br />
 <div class="row">
+    <div class="col-5">
+        <label for="name" class="form-label">Name:</label>
+        <input type="text" class="form-control" id="name" @bind-value="_deck.Name" />
+        <div class="row mt-2">
+            <div class="col-5">
+                <label for="author" class="form-label">Author:</label>
+                <input type="text" class="form-control" id="author" @bind-value="_deck.Author.Name" />
+            </div>
+        </div>
+    </div>
+    <div class="col-4">
+        <div class="row">
+            <div class="col-6">
+                <label for="create-date" class="form-label">Create Date:</label>
+                <input type="date" class="form-control" id="create-date" @bind-value="_deck.CreateDate" />
+            </div>
+            <div class="col-6">
+                <label for="update-date" class="form-label">Update Date:</label>
+                <input type="date" class="form-control" id="update-date" @bind-value="_deck.UpdateDate" />
+            </div>
+        </div>
+        <div class="row mt-2">
+            <div class="col-6">
+                <div class="form-check">
+                    <label for="main-only" class="form-check-label">Core/Expansions Only</label>
+                    <input type="checkbox" class="form-check-input" id="main-only" @bind="_isMainOnly" />
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-3 d-flex align-items-center justify-content-center">
+        <button class="btn btn-outline-success w-50 h-50" @onclick="TEST">Generate</button>
+    </div>
+</div>
+<br />
+<div class="row">
     <div class="col-6">
         <label for="import-area" class="form-label">Import Text:</label>
-        <textarea class="form-control" id="import-area" rows="30" @bind-value="@_importText" @bind-value:event="oninput"></textarea>
+        <textarea class="form-control" id="import-area" rows="30" @onchange="@(async (text) => await ParseText(text.Value.ToString()))"></textarea>
     </div>
     <div class="col-6">
-        @if (_deckCards.Count > 0)
+        @if (_cards != null && _cards.Count > 0)
         {
+            <h3>Cards: <strong>@_cards.Where(c => c != null).Sum(c => c.Quantity)</strong></h3>
             <ul class="list-group">
-                @foreach (var card in _deckCards)
+                @foreach (var card in _cards)
                 {
-                    <li class="list-group-item">@card.Quantity - @card.Name | @card.Set@(!string.IsNullOrWhiteSpace(card.CollectorNumber) ? $" | {card.CollectorNumber}" : "")</li>
+                    if (card != null)
+                    {
+                        <DeckListItem Card="card"></DeckListItem>
+                    }
                 }
             </ul>
         }
@@ -28,40 +69,46 @@
 
 </div>
 
-<label for="before-date" class="form-label">Sets Released Before:</label>
-<input type="date" class="form-control" id="before-date" @bind-value="_beforeReleaseDate" />
-
-@*<button @onclick="ImportDeck">TEST</button>*@
-@*<button @onclick="InitializeDatabase">Initialize DB</button>*@
-@*<button @onclick="@(() => App.CreateMoxfieldDeckRecordsFromJson("Decks/Moxfield/moxfield_explorer.json"))">DB Decks</button>*@
-@*<button @onclick="App.RecheckCardImplementation">RecheckImplementation</button>*@
-<button @onclick="TEST">TestDB</button>
-
 @code {
     [CascadingParameter]
     public AppState App { get; set; }
 
+    private Data.Deck _deck = new();
+    private List<DeckCard> _cards = new();
     private string _importText;
-    private DateOnly _beforeReleaseDate = DateOnly.FromDateTime(DateTime.Now);
-    private List<DeckCardModel> _deckCards = new();
-    private List<ForgeEditionModel> _allowedSets = new();
-
+    private bool _isMainOnly = true;
     private Regex _patternMoxfield = new Regex(@"(.+?) (.+?) (\(.+?\)) (.+?$)");
+
+    protected override void OnParametersSet()
+    {
+        _deck.CreateDate = DateTime.Now;
+        _deck.UpdateDate = DateTime.Now;
+        _deck.Author = new();
+    }
 
     private async Task TEST()
     {
         //await App.InitializeDatabase(false);
         //var set = DB.GetSet("lea", true);
         //var deck = await DB.GetDeck("DECK 2");
-        //await Downloader.MtgWtfDownload();
-        //var deck = await Generator.GenerateDeck(23201);
-        var deckIds = await DB.GetDeckIdsBySource(5);
+        //await Downloader.Mtgtop8Download();
+        //await GenerateDecks(5);
+        //var deck = await Generator.GenerateDeck(49665);
+        //if (!string.IsNullOrWhiteSpace(deck.Item2)) await IO.SaveTextFile($"./Decks/{deck.Item1.CleanIllegalCharacters()}.dck", deck.Item2);
+        await ImportDeck();
+    }
+
+    private async Task GenerateDecks(int source)
+    {
+        var deckIds = await DB.GetDeckIdsBySource(source);
         var startTime = DateTime.Now;
         var deckIndex = 0;
+        //var files = Directory.GetFiles("./Decks/MTGWTF/").Select(f => f.Split("/").LastOrDefault()).ToList();
         foreach (var id in deckIds)
         {
             deckIndex++;
-            if (deckIndex < 344) continue;
+            //if (files.Any(d => d.StartsWith(id.ToString()))) continue;
+            //if (deckIndex < 344) continue;
             var elapsedTime = DateTime.Now - startTime;
             Console.WriteLine($"Elapsed Time: {elapsedTime:h'h 'm'm 's's'} | {deckIndex}/{deckIds.Count}");
             var deck = await Generator.GenerateDeck(id);
@@ -76,68 +123,57 @@
         await App.InitializeDatabase();
     }
 
-    private void ImportDeck()
+    private async Task ParseText(string text)
     {
-        _deckCards.Clear();
-        ParseImportLines();
-        GetEditions();
-        RandomizeVariants();
+        _importText = text;
+        _cards = await Generator.ParseImportLines(_importText, DateOnly.FromDateTime(_deck.CreateDate), _isMainOnly);
+        await InvokeAsync(StateHasChanged);
     }
 
-    private void ParseImportLines()
+    private async Task ImportDeck()
     {
-        int quantity;
-        string name, set, collectorsNumber;
-
-        foreach (var line in _importText.Split("\n"))
-        {
-            if (!_patternMoxfield.IsMatch(line)) continue;
-            var groups = _patternMoxfield.Matches(line)[0].Groups;
-            quantity = groups[1].Value.ParseToInt();
-            name = groups[2].Value;
-            set = Regex.Replace(groups[3].Value, @"[\(\)]", "", RegexOptions.Compiled).ToLower();
-            collectorsNumber = groups[4].Value;
-            _deckCards.Add(new DeckCardModel() { Name = name, Set = set, CollectorNumber = collectorsNumber, Quantity = quantity != int.MinValue ? quantity : 1 });
-        }
+        //TODO: Create deck info with forms
+        //var deck = await DB.Create(new Deck() { });
+        //await DB.AddCardsToDeck(deck, _cards);
     }
 
-    private void RandomizeVariants()
-    {
-        List<DeckCardModel> tempDecklist = new();
+    //private void RandomizeVariants()
+    //{
+    //    List<DeckCardModel> tempDecklist = new();
 
-        foreach (var card in _deckCards)
-        {
-            if (card.Variations == 1) tempDecklist.Add(card);
-            else
-            {
-                var variation = 1;
-                for (int i = 0; i < card.Quantity; i++)
-                {
-                    tempDecklist.Add(new DeckCardModel() { });
-                }
-            }
-        }
-    }
+    //    foreach (var card in _deckCards)
+    //    {
+    //        if (card.Variations == 1) tempDecklist.Add(card);
+    //        else
+    //        {
+    //            var variation = 1;
+    //            for (int i = 0; i < card.Quantity; i++)
+    //            {
+    //                tempDecklist.Add(new DeckCardModel() { });
+    //            }
+    //        }
+    //    }
+    //}
 
-    private void GetEditions()
-    {
-        _allowedSets.Clear();
+    //private void GetEditions()
+    //{
+    //    _allowedSets.Clear();
 
-        foreach (var card in _deckCards)
-        {
-            var parsedName = card.Name.ToLower().ParseCardname();
-            var cardSets = App.ForgeData.Editions.Where(s => s.Cards.Any(c => c.Name.ToLower().Contains(parsedName)) && s.Date < _beforeReleaseDate).OrderByDescending(s => s.Date);
+    //    foreach (var card in _deckCards)
+    //    {
+    //        var parsedName = card.Name.ToLower().ParseCardname();
+    //        var cardSets = App.ForgeData.Editions.Where(s => s.Cards.Any(c => c.Name.ToLower().Contains(parsedName)) && s.Date < _beforeReleaseDate).OrderByDescending(s => s.Date);
 
-            if (string.IsNullOrWhiteSpace(card.Set)) card.Set = cardSets.ElementAt(0).Code.ToLower();
-            card.Variations = App.ForgeData.Editions.First(s => s.Code.ToLower() == card.Set).Cards.Count(c => c.Name.ToLower().Contains(parsedName));
+    //        if (string.IsNullOrWhiteSpace(card.Set)) card.Set = cardSets.ElementAt(0).Code.ToLower();
+    //        card.Variations = App.ForgeData.Editions.First(s => s.Code.ToLower() == card.Set).Cards.Count(c => c.Name.ToLower().Contains(parsedName));
 
 
-            foreach (var set in cardSets)
-            {
-                if (!_allowedSets.Contains(set)) _allowedSets.Add(set);
-            }
-        }
+    //        foreach (var set in cardSets)
+    //        {
+    //            if (!_allowedSets.Contains(set)) _allowedSets.Add(set);
+    //        }
+    //    }
 
-        _allowedSets.OrderByDescending(s => s.Date);
-    }
+    //    _allowedSets.OrderByDescending(s => s.Date);
+    //}
 }

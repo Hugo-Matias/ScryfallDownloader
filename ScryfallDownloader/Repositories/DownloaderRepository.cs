@@ -22,6 +22,7 @@ namespace ScryfallDownloader.Repositories
         }
 
         public async Task MoxfieldDownload() => await _moxfield.Download();
+        public async Task MoxfieldDownloadFormats() => await _moxfield.DownloadFormats();
         public async Task ScgDownload() => await _scg.Download();
         public async Task Mtgtop8Download() => await _mtgtop8.Download();
         public async Task EdhrecDownload() => await _edhrec.Download();

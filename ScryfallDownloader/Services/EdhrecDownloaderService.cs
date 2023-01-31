@@ -115,10 +115,10 @@ namespace ScryfallDownloader.Services
                     Format = new Format() { Name = "commander" },
                     CreateDate = date,
                     UpdateDate = DateTime.ParseExact(json!["savedate"]!.ToString(), "yyyy-MM-dd", CultureInfo.InvariantCulture),
-                    Tags = new List<Tag>()
+                    Tags = new List<DeckTag>()
                 };
-                if (json["theme"] != null) deck.Tags.Add(new Tag() { Name = json!["theme"]!.ToString() });
-                if (json["tribe"] != null) deck.Tags.Add(new Tag() { Name = json!["tribe"]!.ToString() });
+                if (json["theme"] != null) deck.Tags.Add(new DeckTag() { Tag = new Tag() { Name = json!["theme"]!.ToString() } });
+                if (json["tribe"] != null) deck.Tags.Add(new DeckTag() { Tag = new Tag() { Name = json!["tribe"]!.ToString() } });
 
                 var createdDeck = await _db.Create(deck);
 

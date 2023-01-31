@@ -1,0 +1,9 @@
+﻿.list-group-item {
+	--bs-list-group-bg: #111;
+	--bs-list-group-color: #ddd;
+}
+
+/*.ss-common {
+	text-shadow: -1px -1px 0 #aaa, 1px -1px 0 #aaa, -1px 1px 0 #aaa, 1px 1px 0 #aaa;
+}
+*/

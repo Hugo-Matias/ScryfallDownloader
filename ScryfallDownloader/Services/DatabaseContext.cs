@@ -52,11 +52,12 @@ namespace ScryfallDownloader.Services
             modelBuilder.Entity<CardColor>().HasKey(e => new { e.CardId, e.ColorId });
             modelBuilder.Entity<CardGenerateColor>().HasKey(e => new { e.CardId, e.ColorId });
             modelBuilder.Entity<CardKeyword>().HasKey(e => new { e.CardId, e.KeywordId });
+            modelBuilder.Entity<DeckTag>().HasKey(e => new { e.DeckId, e.TagId });
 
             modelBuilder.Entity<Card>().HasIndex(nameof(Card.Name), nameof(Card.Set.SetId), nameof(Card.CollectorsNumber)).IsUnique();
             modelBuilder.Entity<Rarity>().HasIndex(e => e.Name).IsUnique();
             modelBuilder.Entity<Artist>().HasIndex(e => e.Name).IsUnique();
-            modelBuilder.Entity<Tag>().HasIndex(e => e.Name).IsUnique();
+            modelBuilder.Entity<Tag>().HasIndex(e => new { e.Name, e.Description }).IsUnique();
             modelBuilder.Entity<Author>().HasIndex(e => e.Name).IsUnique();
             modelBuilder.Entity<Source>().HasIndex(e => e.Name).IsUnique();
             modelBuilder.Entity<Format>().HasIndex(e => e.Name).IsUnique();

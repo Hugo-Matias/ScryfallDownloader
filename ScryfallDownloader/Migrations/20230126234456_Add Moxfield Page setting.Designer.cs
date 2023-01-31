@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ScryfallDownloader.Services;
 
@@ -10,9 +11,11 @@ using ScryfallDownloader.Services;
 namespace ScryfallDownloader.Migrations
 {
     [DbContext(typeof(DatabaseContext))]
-    partial class DownloaderContextModelSnapshot : ModelSnapshot
+    [Migration("20230126234456_Add Moxfield Page setting")]
+    partial class AddMoxfieldPagesetting
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "7.0.2");
@@ -277,21 +280,6 @@ namespace ScryfallDownloader.Migrations
                     b.ToTable("DeckCards");
                 });
 
-            modelBuilder.Entity("ScryfallDownloader.Data.DeckTag", b =>
-                {
-                    b.Property<int>("DeckId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<int>("TagId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("DeckId", "TagId");
-
-                    b.HasIndex("TagId");
-
-                    b.ToTable("DeckTag");
-                });
-
             modelBuilder.Entity("ScryfallDownloader.Data.EdhrecCommander", b =>
                 {
                     b.Property<int>("EdhrecCommanderId")
@@ -519,6 +507,9 @@ namespace ScryfallDownloader.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("DeckId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("Description")
                         .HasColumnType("TEXT");
 
@@ -528,7 +519,9 @@ namespace ScryfallDownloader.Migrations
 
                     b.HasKey("TagId");
 
-                    b.HasIndex("Name", "Description")
+                    b.HasIndex("DeckId");
+
+                    b.HasIndex("Name")
                         .IsUnique();
 
                     b.ToTable("Tags");
@@ -678,25 +671,6 @@ namespace ScryfallDownloader.Migrations
                     b.Navigation("Deck");
                 });
 
-            modelBuilder.Entity("ScryfallDownloader.Data.DeckTag", b =>
-                {
-                    b.HasOne("ScryfallDownloader.Data.Deck", "Deck")
-                        .WithMany("Tags")
-                        .HasForeignKey("DeckId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("ScryfallDownloader.Data.Tag", "Tag")
-                        .WithMany()
-                        .HasForeignKey("TagId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Deck");
-
-                    b.Navigation("Tag");
-                });
-
             modelBuilder.Entity("ScryfallDownloader.Data.Set", b =>
                 {
                     b.HasOne("ScryfallDownloader.Data.SetType", "SetType")
@@ -704,6 +678,13 @@ namespace ScryfallDownloader.Migrations
                         .HasForeignKey("SetTypeId");
 
                     b.Navigation("SetType");
+                });
+
+            modelBuilder.Entity("ScryfallDownloader.Data.Tag", b =>
+                {
+                    b.HasOne("ScryfallDownloader.Data.Deck", null)
+                        .WithMany("Tags")
+                        .HasForeignKey("DeckId");
                 });
 
             modelBuilder.Entity("ScryfallDownloader.Data.Card", b =>

@@ -1,5 +1,5 @@
 ﻿textarea, textarea:focus {
-	background: #111;
+	background: #222;
 	border-color: #333;
 	color: white;
 }
@@ -8,3 +8,8 @@
 		box-shadow: none;
 		border-color: #555;
 	}
+
+.expand-btn {
+	width: 100%;
+	height: 100%;
+}

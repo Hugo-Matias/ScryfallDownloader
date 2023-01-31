@@ -6,7 +6,7 @@
         public Uri Link { get; set; }
         public string Description { get; set; }
         public int Finish { get; set; }
-        public string Player { get; set; }
+        public string Author { get; set; }
         public string? Event { get; set; }
         public string Format { get; set; }
         public DateTime Date { get; set; }
